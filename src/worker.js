@@ -3,57 +3,68 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      let kv = false;
-      let ai = false;
+      const result = {
+        ok: true,
+        service: "NowPulse",
+        bindings: {
+          kv_exists: Boolean(env.NOWPULSE_KV),
+          ai_exists: Boolean(env.AI)
+        },
+        kv: {
+          ok: false,
+          error: null
+        },
+        ai: {
+          ok: false,
+          error: null
+        },
+        cron: "enabled",
+        time: new Date().toISOString()
+      };
 
       try {
-        if (env.NOWPULSE_KV) {
-          await env.NOWPULSE_KV.put(
-            "nowpulse_health",
-            new Date().toISOString(),
-            { expirationTtl: 300 }
-          );
-
-          kv = true;
+        if (!env.NOWPULSE_KV) {
+          throw new Error("NOWPULSE_KV binding is missing");
         }
+
+        await env.NOWPULSE_KV.put(
+          "nowpulse_health",
+          new Date().toISOString(),
+          {
+            expirationTtl: 300
+          }
+        );
+
+        result.kv.ok = true;
       } catch (error) {
-        kv = false;
+        result.kv.error = String(error?.message || error);
       }
 
       try {
-        if (env.AI) {
-          const result = await env.AI.run(
-            "@cf/meta/llama-3.1-8b-instruct",
-            {
-              messages: [
-                {
-                  role: "user",
-                  content: "Reply with exactly: OK"
-                }
-              ],
-              max_tokens: 10
-            }
-          );
-
-          ai = Boolean(result);
+        if (!env.AI) {
+          throw new Error("AI binding is missing");
         }
+
+        const aiResult = await env.AI.run(
+          "@cf/meta/llama-3.1-8b-instruct",
+          {
+            messages: [
+              {
+                role: "user",
+                content: "Reply with exactly: OK"
+              }
+            ],
+            max_tokens: 10
+          }
+        );
+
+        result.ai.ok = Boolean(aiResult);
       } catch (error) {
-        ai = false;
+        result.ai.error = String(error?.message || error);
       }
 
       return new Response(
-        JSON.stringify(
-          {
-            ok: true,
-            service: "NowPulse",
-            kv,
-            ai,
-            cron: "enabled",
-            time: new Date().toISOString()
-          },
-          null,
-          2
-        ),
+        JSON.stringify(result, null, 2),
         {
           headers: {
             "content-type": "application/json; charset=UTF-8"
@@ -85,7 +96,7 @@ export default {
         );
       }
     } catch (error) {
-      // لا نسمح بخطأ KV بإسقاط Cron بالكامل
+      // Cron must not fail because of KV errors.
     }
   }
 };
