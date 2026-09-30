@@ -1,0 +1,27 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "nowpulse",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-30",
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "NOWPULSE_KV",
+      "id": "184c64ea1ed443e1bac081453cd599bf"
+    }
+  ],
+
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  "vars": {
+    "NOWPULSE_ENV": "production",
+    "NOWPULSE_AI_REPAIR": "enabled",
+    "NOWPULSE_AI_REPAIR_MODE": "safe"
+  }
+}
