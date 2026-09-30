@@ -1,1340 +1,1456 @@
-const VERSION = "4.0.0";
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const VERSION = "5.0.0";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 
-const MAX_ARTICLES = 180;
+const MAX_LATEST = 120;
+const ARCHIVE_DAYS = 14;
 const FRESH_HOURS = 72;
+const FETCH_TIMEOUT = 7000;
 
 const CATEGORIES = {
-  latest: { ar: "آخر الأخبار", en: "Latest", icon: "✦", tone: "latest" },
-  egypt: { ar: "مصر", en: "Egypt", icon: "𓂀", tone: "egypt" },
-  world: { ar: "العالم", en: "World", icon: "◉", tone: "world" },
-  politics: { ar: "سياسة", en: "Politics", icon: "▣", tone: "politics" },
-  sports: { ar: "رياضة", en: "Sports", icon: "⚽", tone: "sports" },
-  economy: { ar: "اقتصاد", en: "Economy", icon: "◈", tone: "economy" },
-  tech: { ar: "تكنولوجيا", en: "Technology", icon: "⌘", tone: "tech" },
-  arts: { ar: "فن", en: "Arts", icon: "✦", tone: "arts" },
-  health: { ar: "صحة", en: "Health", icon: "✚", tone: "health" },
-  travel: { ar: "سفر", en: "Travel", icon: "✈", tone: "travel" },
-  trends: { ar: "الترند", en: "Trending", icon: "⌁", tone: "trends" },
-  markets: { ar: "الأسواق", en: "Markets", icon: "₿", tone: "markets" },
-  weather: { ar: "الطقس", en: "Weather", icon: "☁", tone: "weather" }
+  latest: { ar: "آخر الأخبار", en: "Latest" },
+  egypt: { ar: "مصر", en: "Egypt" },
+  world: { ar: "العالم", en: "World" },
+  politics: { ar: "سياسة", en: "Politics" },
+  sports: { ar: "رياضة", en: "Sports" },
+  economy: { ar: "اقتصاد", en: "Economy" },
+  tech: { ar: "تكنولوجيا", en: "Technology" },
+  arts: { ar: "فن", en: "Arts" },
+  health: { ar: "صحة", en: "Health" },
+  travel: { ar: "سفر", en: "Travel" },
+  trends: { ar: "ترند", en: "Trends" }
 };
 
-const SOURCES = [
+const FEEDS = [
   [
     "egypt",
-    "https://news.google.com/rss/search?q=Egypt%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=Egypt+OR+Cairo+when:3d&hl=ar&gl=EG&ceid=EG:ar"
   ],
   [
     "world",
-    "https://news.google.com/rss/search?q=world%20news%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=world+news+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "politics",
-    "https://news.google.com/rss/search?q=politics%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=politics+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "sports",
-    "https://news.google.com/rss/search?q=sports%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=sports+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "economy",
-    "https://news.google.com/rss/search?q=economy%20finance%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=economy+OR+business+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "tech",
-    "https://news.google.com/rss/search?q=technology%20AI%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=technology+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "arts",
-    "https://news.google.com/rss/search?q=entertainment%20arts%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=entertainment+OR+arts+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "health",
-    "https://news.google.com/rss/search?q=health%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=health+when:3d&hl=en&gl=US&ceid=US:en"
   ],
   [
     "travel",
-    "https://news.google.com/rss/search?q=travel%20when%3A3d&hl=en-US&gl=US&ceid=US%3Aen"
+    "https://news.google.com/rss/search?q=travel+when:3d&hl=en&gl=US&ceid=US:en"
   ]
 ];
 
-const QUOTES = [
-  ["العربية", "كل خبر يبدأ بسؤال، وكل معرفة تبدأ بالتحقق."],
-  ["العربية", "المعلومة الدقيقة أقوى من الخبر الأسرع."],
-  ["العربية", "اسأل، تحقق، ثم كوّن رأيك."],
-  ["English", "Good information starts with verification."],
-  ["English", "Read the facts. Then make up your mind."],
-  ["English", "Speed matters, but accuracy matters more."]
-];
-
-const CITY = {
-  cairo: [30.0444, 31.2357, "القاهرة", "Cairo"],
-  giza: [30.0131, 31.2089, "الجيزة", "Giza"],
-  alexandria: [31.2001, 29.9187, "الإسكندرية", "Alexandria"],
-  hurghada: [27.2579, 33.8116, "الغردقة", "Hurghada"],
-  luxor: [25.6872, 32.6396, "الأقصر", "Luxor"],
-  aswan: [24.0889, 32.8998, "أسوان", "Aswan"],
-  portsaid: [31.2653, 32.3019, "بورسعيد", "Port Said"],
-  suez: [29.9668, 32.5498, "السويس", "Suez"]
+const CITY_COORDS = {
+  cairo: [30.0444, 31.2357],
+  alexandria: [31.2001, 29.9187],
+  giza: [30.0131, 31.2089],
+  hurghada: [27.2579, 33.8116],
+  luxor: [25.6872, 32.6396],
+  aswan: [24.0889, 32.8998],
+  qena: [26.1551, 32.716],
+  sohag: [26.5591, 31.6959],
+  assiut: [27.1801, 31.1837],
+  mansoura: [31.0409, 31.3785],
+  tanta: [30.7865, 31.0004],
+  ismailia: [30.5965, 32.2715],
+  suez: [29.9668, 32.5498],
+  portsaid: [31.2653, 32.3019],
+  fayoum: [29.3084, 30.8428]
 };
 
-function json(data, status = 200, headers = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      ...headers
-    }
-  });
+const QUOTES = [
+  {
+    ar: "المعلومة الدقيقة تبدأ من مصدر موثوق.",
+    en: "Accurate information starts with a trusted source."
+  },
+  {
+    ar: "تابع الخبر، وافهم الصورة كاملة.",
+    en: "Follow the story. Understand the full picture."
+  },
+  {
+    ar: "الأخبار تتغير، والمعلومة تحتاج إلى تحقق.",
+    en: "News changes. Information needs verification."
+  },
+  {
+    ar: "كل خبر جديد يضيف جزءًا من الصورة.",
+    en: "Every new story adds another piece to the picture."
+  }
+];
+
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function html(body, status = 200, headers = {}) {
-  return new Response(body, {
-    status,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "public, max-age=30, stale-while-revalidate=120",
-      ...headers
-    }
-  });
-}
+function cleanText(value) {
+  let s = String(value ?? "");
 
-function esc(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    c =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-      })[c]
-  );
-}
+  for (let i = 0; i < 3; i++) {
+    s = s.replace(
+      /&(#x[0-9a-f]+|#\d+|nbsp|amp|quot|apos|lt|gt);?/gi,
+      (match, entity) => {
+        const k = entity.toLowerCase();
 
-function attr(s) {
-  return esc(s).replace(/`/g, "&#96;");
-}
+        if (k === "nbsp") return " ";
+        if (k === "amp") return "&";
+        if (k === "quot") return '"';
+        if (k === "apos") return "'";
+        if (k === "lt") return "<";
+        if (k === "gt") return ">";
 
-function decodeEntities(s) {
-  return String(s).replace(
-    /&(#x[0-9a-f]+|#\d+|nbsp|amp|quot|apos|lt|gt);?/gi,
-    (m, x) => {
-      const k = x.toLowerCase();
+        const number = k.startsWith("#x")
+          ? parseInt(k.slice(2), 16)
+          : parseInt(k.slice(1), 10);
 
-      if (k === "nbsp") return " ";
-      if (k === "amp") return "&";
-      if (k === "quot") return '"';
-      if (k === "apos") return "'";
-      if (k === "lt") return "<";
-      if (k === "gt") return ">";
+        if (
+          Number.isFinite(number) &&
+          number >= 0 &&
+          number <= 0x10ffff
+        ) {
+          return String.fromCodePoint(number);
+        }
 
-      if (k.startsWith("#x")) {
-        return String.fromCodePoint(parseInt(k.slice(2), 16));
+        return " ";
       }
+    );
+  }
 
-      if (k.startsWith("#")) {
-        return String.fromCodePoint(parseInt(k.slice(1), 10));
-      }
-
-      return m;
-    }
-  );
-}
-
-function normalize(s) {
-  return decodeEntities(String(s ?? ""))
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\\#/g, "")
-    .replace(/^\s*#+\s*/g, "")
-    .replace(/&nbsp;|nbsp;/gi, " ")
+  return s
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\\#{1,6}\s*/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function truncate(s, n = 220) {
-  const x = normalize(s);
+function stripHtml(value) {
+  return cleanText(value);
+}
 
-  if (x.length <= n) {
-    return x;
+function isoDate(value) {
+  const date = new Date(value || 0);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString();
   }
 
-  return x.slice(0, n - 1).trimEnd() + "…";
+  return date.toISOString();
 }
 
-function hash(s) {
-  let h = 2166136261;
-
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-
-  return (h >>> 0).toString(36);
-}
-
-function uid(a, b) {
-  return hash(`${a}|${b}`).slice(0, 12);
-}
-
-function absUrl(u, base) {
-  try {
-    return new URL(u, base).href;
-  } catch {
-    return "";
-  }
-}
-
-function timeoutSignal(ms) {
+function timeoutFetch(url, init = {}, milliseconds = FETCH_TIMEOUT) {
   const controller = new AbortController();
 
   const timer = setTimeout(() => {
-    controller.abort("timeout");
-  }, ms);
+    try {
+      controller.abort("timeout");
+    } catch {}
+  }, milliseconds);
 
-  return {
-    signal: controller.signal,
-    done: () => clearTimeout(timer)
-  };
+  return fetch(url, {
+    ...init,
+    signal: controller.signal
+  }).finally(() => clearTimeout(timer));
 }
 
-async function fetchText(url, ms = 6500, headers = {}) {
-  const t = timeoutSignal(ms);
+function between(xml, tag) {
+  const expression = new RegExp(
+    `<${tag}[^>]*>([\\s\\S]*?)</${tag}>`,
+    "i"
+  );
 
-  try {
-    const response = await fetch(url, {
-      signal: t.signal,
-      redirect: "follow",
-      headers: {
-        "user-agent": "NowPulse/4.0 News Reader",
-        accept: "text/html,application/xml,text/xml,*/*",
-        ...headers
-      }
-    });
+  const match = String(xml).match(expression);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return await response.text();
-  } finally {
-    t.done();
-  }
-}
-
-async function safeFetch(url, ms = 6500, headers = {}) {
-  try {
-    return await fetchText(url, ms, headers);
-  } catch {
-    return "";
-  }
+  return match ? match[1] : "";
 }
 
 function xmlItems(xml) {
-  const out = [];
-  const re = /<item[\s\S]*?<\/item>/gi;
+  const result = [];
 
-  let match;
+  const blocks =
+    String(xml).match(/<item\b[\s\S]*?<\/item>/gi) || [];
 
-  while ((match = re.exec(xml)) && out.length < 40) {
-    const item = match[0];
+  for (const block of blocks) {
+    const title = stripHtml(between(block, "title"));
+    const link = stripHtml(between(block, "link"));
 
-    const value = tag => {
-      const r = new RegExp(
-        `<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`,
-        "i"
-      ).exec(item);
+    const pubDate = stripHtml(
+      between(block, "pubDate") ||
+        between(block, "dc:date")
+    );
 
-      return r ? r[1] : "";
-    };
+    const description = stripHtml(
+      between(block, "description")
+    );
 
-    const title = normalize(value("title"));
-    const link = normalize(value("link"));
-    const pubDate = normalize(value("pubDate"));
-    const description = normalize(value("description"));
-    const source = normalize(value("source"));
+    const source = stripHtml(
+      between(block, "source")
+    );
 
-    const imageMatch =
-      /<(?:media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i.exec(
-        item
+    const media =
+      block.match(
+        /<(?:media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i
       );
 
-    const image = imageMatch ? decodeEntities(imageMatch[1]) : "";
-
-    if (title && link) {
-      out.push({
-        title,
-        link,
-        pubDate,
-        description,
-        source,
-        image
-      });
+    if (!title || !link) {
+      continue;
     }
+
+    result.push({
+      title,
+      link,
+      description,
+      source,
+      date: isoDate(pubDate),
+      originalImage: media ? media[1] : ""
+    });
   }
 
-  return out;
+  return result;
 }
 
-function dateMs(value) {
-  const time = Date.parse(value || "");
-  return Number.isFinite(time) ? time : 0;
-}
-
-function isFresh(time) {
-  return (
-    time > 0 &&
-    time <= Date.now() + 2 * 3600 * 1000 &&
-    time >= Date.now() - FRESH_HOURS * 3600 * 1000
-  );
-}
-
-function cleanTitle(title) {
-  return normalize(title)
-    .replace(/\s*[-|–—]\s*[^-–—|]{1,80}$/u, "")
-    .trim();
-}
-
-function sourceHost(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-}
-
-function quality(article) {
-  const bad = [
-    "pinterest",
-    "facebook",
-    "tiktok",
-    "youtube.com",
-    "medium.com",
-    "blogspot",
-    "wordpress",
-    "pressrelease",
-    "prnewswire",
-    "unknown"
-  ];
-
-  const host = sourceHost(article.link);
-  let score = 0;
-
-  if (article.title.length > 25) score += 2;
-  if (article.description.length > 40) score += 1;
-  if (isFresh(article.time)) score += 4;
-  if (host) score += 1;
-
-  if (!bad.some(x => host.includes(x))) {
-    score += 2;
+function classify(title, category) {
+  if (category && CATEGORIES[category]) {
+    return category;
   }
 
-  if (/^(200\d|201\d|2020|2021|2022)\b/.test(article.title)) {
-    score -= 5;
+  const value = String(title).toLowerCase();
+
+  if (
+    /football|soccer|match|goal|premier|champions|sport|محمد صلاح|أهلي|زمالك/.test(
+      value
+    )
+  ) {
+    return "sports";
   }
 
-  return score;
+  if (
+    /stock|market|gold|oil|economy|business|bank|currency|اقتصاد|ذهب|دولار/.test(
+      value
+    )
+  ) {
+    return "economy";
+  }
+
+  if (
+    /technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي/.test(
+      value
+    )
+  ) {
+    return "tech";
+  }
+
+  if (/health|medical|hospital|doctor|صحة|طب/.test(value)) {
+    return "health";
+  }
+
+  if (
+    /movie|film|music|actor|actress|entertainment|فن|فيلم|مسلسل/.test(
+      value
+    )
+  ) {
+    return "arts";
+  }
+
+  if (
+    /travel|tourism|flight|airport|سياحة|سفر|طيران/.test(
+      value
+    )
+  ) {
+    return "travel";
+  }
+
+  if (
+    /president|government|election|minister|politic|رئيس|حكومة|انتخابات|سياسة/.test(
+      value
+    )
+  ) {
+    return "politics";
+  }
+
+  return "world";
 }
 
-function classify(title, preferred = "latest") {
-  const text = title.toLowerCase();
+function makeId(article) {
+  const base =
+    `${article.category}-${article.title}-${article.link}`
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0600-\u06ff]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100);
 
-  const rules = {
-    sports:
-      /football|soccer|match|goal|league|champions|premier|arsenal|chelsea|liverpool|manchester|real madrid|barcelona|al ahly|zamalek|tennis|basketball|olympic|رياضة|الأهلي|الزمالك|مباراة|الدوري|كرة/,
-    economy:
-      /economy|finance|market|stock|gold|oil|inflation|interest rate|bank|currency|dollar|euro|اقتصاد|ذهب|دولار|أسعار|بنك|بورصة|نفط/,
-    tech:
-      /technology|tech|ai|artificial intelligence|iphone|android|google|microsoft|apple|openai|chip|cyber|تكنولوجيا|ذكاء اصطناعي|هاتف|أبل|جوجل|مايكروسوفت/,
-    arts:
-      /film|movie|music|actor|actress|singer|celebrity|festival|cinema|فن|فيلم|سينما|ممثل|مغني|مهرجان/,
-    health:
-      /health|medical|hospital|disease|vaccine|doctor|صحة|مرض|مستشفى|دواء|لقاح|طبيب/,
-    travel:
-      /travel|tourism|flight|airport|hotel|tour|سفر|سياحة|طيران|مطار|فنادق/,
-    politics:
-      /president|minister|government|election|parliament|senate|politics|ترامب|رئيس|وزير|حكومة|انتخابات|برلمان|سياسة/,
-    egypt:
-      /egypt|cairo|giza|alexandria|hurghada|luxor|aswan|egyptian|مصر|القاهرة|الجيزة|الإسكندرية|الغردقة|الأقصر|أسوان|مصري/
+  return `${base}-${new Date(article.date).getTime()}`;
+}
+
+function normalizeArticle(raw, category) {
+  const article = {
+    ...raw
   };
 
-  for (const [category, regex] of Object.entries(rules)) {
-    if (regex.test(text)) {
-      return category;
-    }
-  }
+  article.title = cleanText(article.title);
+  article.description = cleanText(article.description);
+  article.source = cleanText(article.source) || "News source";
+  article.date = isoDate(article.date);
+  article.category = classify(article.title, category);
 
-  return preferred && CATEGORIES[preferred] ? preferred : "world";
+  article.id =
+    article.id ||
+    makeId(article);
+
+  article.originalImage =
+    /^https?:\/\//i.test(article.originalImage || "")
+      ? article.originalImage
+      : "";
+
+  return article;
 }
 
 async function fetchFeed(category, url) {
-  const xml = await safeFetch(url, 7000);
+  try {
+    const response = await timeoutFetch(
+      url,
+      {
+        headers: {
+          accept:
+            "application/rss+xml, application/xml, text/xml"
+        }
+      }
+    );
 
-  if (!xml) {
+    if (!response.ok) {
+      return [];
+    }
+
+    const xml = await response.text();
+
+    const cutoff =
+      Date.now() -
+      FRESH_HOURS * 60 * 60 * 1000;
+
+    return xmlItems(xml)
+      .filter(
+        item =>
+          new Date(item.date).getTime() >= cutoff
+      )
+      .map(item =>
+        normalizeArticle(item, category)
+      );
+  } catch {
     return [];
   }
-
-  return xmlItems(xml)
-    .map(item => ({
-      id: uid(item.link, item.title),
-      title: cleanTitle(item.title),
-      description: truncate(item.description, 280),
-      link: item.link,
-      source: item.source || sourceHost(item.link),
-      time: dateMs(item.pubDate),
-      category: classify(item.title, category),
-      image: absUrl(item.image || "", url) || "",
-      originalImage: absUrl(item.image || "", url) || "",
-      lang: /[\u0600-\u06ff]/.test(item.title) ? "ar" : "en"
-    }))
-    .filter(
-      article =>
-        article.time &&
-        isFresh(article.time) &&
-        article.title.length >= 18
-    );
 }
 
-async function ingest(env) {
-  const jobs = await Promise.allSettled(
-    SOURCES.map(source => fetchFeed(source[0], source[1]))
+async function loadFeed(env, force = false) {
+  let cached = null;
+
+  if (env.NOWPULSE_KV) {
+    cached = await env.NOWPULSE_KV
+      .get("feed:latest", "json")
+      .catch(() => null);
+  }
+
+  if (
+    !force &&
+    Array.isArray(cached) &&
+    cached.length
+  ) {
+    return cached;
+  }
+
+  const groups = await Promise.all(
+    FEEDS.map(([category, url]) =>
+      fetchFeed(category, url)
+    )
   );
 
   const map = new Map();
 
-  for (const result of jobs) {
-    if (result.status !== "fulfilled") continue;
+  for (const group of groups) {
+    for (const article of group) {
+      const key =
+        article.link ||
+        article.title;
 
-    for (const article of result.value) {
-      const old = map.get(article.id);
-
-      if (!old || quality(article) > quality(old)) {
-        map.set(article.id, article);
+      if (!map.has(key)) {
+        map.set(key, article);
       }
     }
   }
 
-  const incoming = [...map.values()]
-    .sort((a, b) => b.time - a.time)
-    .slice(0, MAX_ARTICLES);
+  const items = [...map.values()]
+    .filter(
+      article =>
+        Date.now() -
+          new Date(article.date).getTime() <=
+        FRESH_HOURS * 60 * 60 * 1000
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.date) -
+        new Date(a.date)
+    )
+    .slice(0, MAX_LATEST);
 
-  if (!env.NOWPULSE_KV) {
-    return incoming;
-  }
-
-  try {
-    const oldValue =
-      (await env.NOWPULSE_KV.get("feed:latest")) || "[]";
-
-    const old = JSON.parse(oldValue);
-    const merged = new Map(old.map(item => [item.id, item]));
-
-    for (const article of incoming) {
-      merged.set(article.id, {
-        ...merged.get(article.id),
-        ...article
-      });
-    }
-
-    const final = [...merged.values()]
-      .filter(
-        article =>
-          article.time &&
-          article.time >= Date.now() - 14 * 86400000
-      )
-      .sort((a, b) => b.time - a.time)
-      .slice(0, MAX_ARTICLES);
-
-    const oldIds = old.map(x => x.id).join(",");
-    const newIds = final.map(x => x.id).join(",");
-
-    if (oldIds !== newIds || old.length !== final.length) {
-      await env.NOWPULSE_KV.put(
+  if (
+    env.NOWPULSE_KV &&
+    items.length
+  ) {
+    await env.NOWPULSE_KV
+      .put(
         "feed:latest",
-        JSON.stringify(final),
+        JSON.stringify(items),
         {
-          expirationTtl: 86400
+          expirationTtl: 3600
         }
-      );
+      )
+      .catch(() => {});
+  }
+
+  return items;
+}
+
+async function archiveFeed(env, items) {
+  if (
+    !env.NOWPULSE_KV ||
+    !items.length
+  ) {
+    return;
+  }
+
+  const old =
+    await env.NOWPULSE_KV
+      .get("feed:archive", "json")
+      .catch(() => []);
+
+  const merged = [
+    ...items,
+    ...(Array.isArray(old) ? old : [])
+  ];
+
+  const cutoff =
+    Date.now() -
+    ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
+
+  const map = new Map();
+
+  for (const article of merged) {
+    if (
+      new Date(article.date).getTime() <
+      cutoff
+    ) {
+      continue;
     }
 
-    return final;
-  } catch {
-    return incoming;
+    const key =
+      article.link ||
+      article.title;
+
+    if (!map.has(key)) {
+      map.set(key, article);
+    }
   }
-}
 
-async function getFeed(env) {
-  if (env.NOWPULSE_KV) {
-    try {
-      const value = await env.NOWPULSE_KV.get("feed:latest");
-
-      if (value) {
-        const articles = JSON.parse(value);
-
-        if (articles.length) {
-          return articles;
-        }
+  await env.NOWPULSE_KV
+    .put(
+      "feed:archive",
+      JSON.stringify(
+        [...map.values()].slice(0, 1000)
+      ),
+      {
+        expirationTtl:
+          ARCHIVE_DAYS * 24 * 60 * 60
       }
-    } catch {}
-  }
-
-  return ingest(env);
+    )
+    .catch(() => {});
 }
 
-function relevantImageUrl(id, title = "", url = "") {
-  return `/api/image?id=${encodeURIComponent(id)}&title=${encodeURIComponent(
-    title
-  )}&url=${encodeURIComponent(url)}`;
-}
-
-async function resolveImage(env, article) {
+async function extractImage(article) {
   if (
     article.originalImage &&
-    /^https?:\/\//i.test(article.originalImage)
+    /^https?:\/\//i.test(
+      article.originalImage
+    )
   ) {
     return article.originalImage;
   }
 
-  const page = await safeFetch(article.link, 6000);
+  try {
+    const response = await timeoutFetch(
+      article.link,
+      {
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 NowPulseBot/1.0"
+        }
+      },
+      6000
+    );
 
-  if (page) {
+    if (!response.ok) {
+      return "";
+    }
+
+    const html =
+      await response.text();
+
     const patterns = [
       /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
       /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
       /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i
     ];
 
-    for (const regex of patterns) {
-      const match = regex.exec(page);
+    for (const pattern of patterns) {
+      const match =
+        html.match(pattern);
 
-      if (match) {
-        const url = absUrl(
-          decodeEntities(match[1]),
-          article.link
-        );
-
-        if (/^https?:\/\//i.test(url)) {
-          return url;
-        }
+      if (
+        match &&
+        /^https?:\/\//i.test(match[1])
+      ) {
+        return match[1];
       }
     }
 
-    const jsonLd = page.match(
-      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
-    );
+    const wikiUrl =
+      "https://commons.wikimedia.org/w/api.php" +
+      "?action=query" +
+      "&generator=search" +
+      "&gsrnamespace=6" +
+      "&prop=imageinfo" +
+      "&iiprop=url" +
+      "&iiurlwidth=900" +
+      "&format=json" +
+      "&origin=*" +
+      `&gsrsearch=${encodeURIComponent(article.title)}`;
 
-    if (jsonLd) {
-      try {
-        const parsed = JSON.parse(jsonLd[1]);
-        const objects = Array.isArray(parsed) ? parsed : [parsed];
+    const wiki =
+      await timeoutFetch(
+        wikiUrl,
+        {},
+        5000
+      );
 
-        for (const object of objects) {
-          const image = object?.image;
+    if (wiki.ok) {
+      const data =
+        await wiki.json();
 
-          const url =
-            Array.isArray(image)
-              ? image[0]
-              : typeof image === "object"
-              ? image?.url
-              : image;
+      const pages =
+        Object.values(
+          data?.query?.pages || {}
+        );
 
-          if (url) {
-            const absolute = absUrl(url, article.link);
+      const image =
+        pages[0]?.imageinfo?.[0]
+          ?.thumburl ||
+        pages[0]?.imageinfo?.[0]?.url;
 
-            if (absolute) {
-              return absolute;
-            }
-          }
-        }
-      } catch {}
-    }
-  }
-
-  const query = encodeURIComponent(
-    article.title
-      .replace(/[^\p{L}\p{N}\s]/gu, " ")
-      .slice(0, 100)
-  );
-
-  const commons = await safeFetch(
-    `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${query}&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&format=json`,
-    5000,
-    {
-      accept: "application/json"
-    }
-  );
-
-  try {
-    const data = JSON.parse(commons);
-    const page = Object.values(data.query?.pages || {})[0];
-    const url = page?.imageinfo?.[0]?.url;
-
-    if (url) {
-      return url;
+      if (
+        /^https?:\/\//i.test(
+          image || ""
+        )
+      ) {
+        return image;
+      }
     }
   } catch {}
 
   return "";
 }
 
-async function storeImage(env, id, url) {
-  if (!env.NOWPULSE_KV || !url) return;
+async function enrichImages(env, items) {
+  const result =
+    items.map(article => ({
+      ...article
+    }));
 
-  try {
-    await env.NOWPULSE_KV.put(
-      `img:${id}`,
-      url,
-      {
-        expirationTtl: 604800
+  const batch =
+    result.slice(0, 30);
+
+  await Promise.all(
+    batch.map(async article => {
+      const key =
+        `img:${article.id}`;
+
+      let cached = null;
+
+      if (env.NOWPULSE_KV) {
+        cached =
+          await env.NOWPULSE_KV
+            .get(key)
+            .catch(() => null);
       }
-    );
-  } catch {}
-}
 
-async function getArticle(env, id) {
-  const feed = await getFeed(env);
-
-  return feed.find(article => article.id === id) || null;
-}
-
-async function ai(env, messages, max_tokens = 900) {
-  if (!env.AI) {
-    return "";
-  }
-
-  try {
-    const task = env.AI.run(
-      env.NOWPULSE_AI_MODEL || AI_MODEL,
-      {
-        messages,
-        max_tokens,
-        temperature: 0.2
+      if (cached) {
+        article.image = cached;
+        return;
       }
-    );
 
-    const result = await Promise.race([
-      task,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("AI timeout")), 9000)
-      )
-    ]);
+      const image =
+        await extractImage(article);
 
-    return typeof result?.response === "string"
-      ? result.response
-      : typeof result?.result === "string"
-      ? result.result
-      : "";
-  } catch {
-    return "";
-  }
-}
+      if (image) {
+        article.image = image;
 
-function factsText(items) {
-  return items
-    .slice(0, 8)
-    .map(
-      (item, index) =>
-        `SOURCE ${index + 1}
-Title: ${item.title}
-Publisher: ${item.source}
-Time: ${new Date(item.time).toISOString()}
-Summary: ${item.description}
-URL: ${item.link}`
-    )
-    .join("\n\n");
-}
-
-async function writeArticle(env, article, lang) {
-  const feed = await getFeed(env);
-
-  const related = feed
-    .filter(
-      item =>
-        item.id !== article.id &&
-        (
-          item.category === article.category ||
-          normalize(item.title)
-            .split(/\s+/)
-            .some(
-              word =>
-                word.length > 5 &&
-                normalize(article.title).includes(word)
+        if (env.NOWPULSE_KV) {
+          await env.NOWPULSE_KV
+            .put(
+              key,
+              image,
+              {
+                expirationTtl:
+                  7 * 24 * 60 * 60
+              }
             )
-        )
-    )
-    .slice(0, 7);
-
-  const sources = [article, ...related];
-
-  const system = `You are the editorial engine of NowPulse.
-
-Write an original factual news article in ${
-    lang === "ar" ? "Arabic" : "English"
-  }.
-
-Use ONLY the supplied source facts.
-
-Compare sources before writing.
-
-Repeated facts across independent sources are stronger.
-
-Never invent:
-- names
-- dates
-- numbers
-- quotes
-- motives
-- causes
-- events
-- locations
-
-If sources conflict, describe the conflict neutrally.
-
-Do not copy wording from any source.
-
-Return clean HTML only using:
-<p>
-<h2>
-<ul>
-<li>
-<strong>
-
-No markdown.
-No external links.
-No source list.
-No preamble.
-
-The article must be a real readable article, normally 5 to 9 paragraphs.`;
-
-  const output = await ai(
-    env,
-    [
-      {
-        role: "system",
-        content: system
-      },
-      {
-        role: "user",
-        content:
-          `MAIN STORY:\n${article.title}\n\n` +
-          factsText(sources)
+            .catch(() => {});
+        }
       }
-    ],
-    1100
+    })
   );
-
-  return normalizeAIHtml(output) ||
-    `<p>${esc(article.description || article.title)}</p>`;
-}
-
-function normalizeAIHtml(text) {
-  if (!text) return "";
-
-  return text
-    .replace(/```(?:html)?/gi, "")
-    .replace(/```/g, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .trim();
-}
-
-async function searchNews(env, query) {
-  const q = String(query || "").trim().slice(0, 100);
-
-  if (q.length < 2) {
-    return [];
-  }
-
-  const urls = [
-    `https://news.google.com/rss/search?q=${encodeURIComponent(
-      `${q} when:3d`
-    )}&hl=en-US&gl=US&ceid=US:en`,
-    `https://news.google.com/rss/search?q=${encodeURIComponent(
-      `${q} أخبار when:3d`
-    )}&hl=ar&gl=EG&ceid=EG:ar`
-  ];
-
-  const results = await Promise.allSettled(
-    urls.map(url => safeFetch(url, 6500))
-  );
-
-  const map = new Map();
-
-  for (const result of results) {
-    if (result.status !== "fulfilled" || !result.value) {
-      continue;
-    }
-
-    for (const item of xmlItems(result.value)) {
-      const article = {
-        id: uid(item.link, item.title),
-        title: cleanTitle(item.title),
-        description: truncate(item.description),
-        link: item.link,
-        source: item.source || sourceHost(item.link),
-        time: dateMs(item.pubDate),
-        category: classify(item.title),
-        image: absUrl(item.image || "", urls[0]) || "",
-        originalImage: absUrl(item.image || "", urls[0]) || "",
-        lang: /[\u0600-\u06ff]/.test(item.title)
-          ? "ar"
-          : "en"
-      };
-
-      if (
-        article.time &&
-        isFresh(article.time) &&
-        article.title.length > 10
-      ) {
-        map.set(article.id, article);
-      }
-    }
-  }
-
-  return [...map.values()]
-    .sort((a, b) => b.time - a.time)
-    .slice(0, 30);
-}
-
-async function markets() {
-  const result = {
-    gold: null,
-    fx: {}
-  };
-
-  try {
-    const controller = timeoutSignal(5000);
-
-    const response = await fetch(
-      "https://api.frankfurter.app/latest?from=USD&to=EGP,EUR,GBP,CHF",
-      {
-        signal: controller.signal
-      }
-    );
-
-    controller.done();
-
-    const data = await response.json();
-
-    result.fx = data.rates || {};
-  } catch {}
-
-  try {
-    const controller = timeoutSignal(5000);
-
-    const response = await fetch(
-      "https://api.gold-api.com/price/XAU",
-      {
-        signal: controller.signal
-      }
-    );
-
-    controller.done();
-
-    const data = await response.json();
-
-    result.gold = Number(data.price) || null;
-  } catch {}
 
   return result;
 }
 
-async function weather(city = "cairo") {
-  const selected = CITY[city] || CITY.cairo;
+function aiText(result) {
+  return (
+    result?.response ||
+    result?.result?.response ||
+    result?.output_text ||
+    ""
+  );
+}
+
+function fallbackArticle(article) {
+  const description =
+    article.description ||
+    article.title;
+
+  return [
+    article.title,
+    "",
+    description,
+    "",
+    "تستند هذه المادة إلى المعلومات المتاحة في المصدر المشار إليه. وقد تتغير التفاصيل مع ورود تحديثات جديدة من مصادر موثوقة.",
+    "",
+    "سيتم تحديث القصة في NowPulse عند توفر معلومات إضافية مؤكدة."
+  ].join("\n");
+}
+
+async function writeArticle(
+  env,
+  article,
+  related
+) {
+  if (!env.AI) {
+    return fallbackArticle(article);
+  }
+
+  const sources = [
+    article,
+    ...related
+      .filter(
+        item =>
+          item.link !== article.link
+      )
+      .slice(0, 5)
+  ]
+    .map(
+      (item, index) =>
+        `SOURCE ${index + 1}
+Title: ${item.title}
+Source: ${item.source}
+Date: ${item.date}
+Description: ${item.description}`
+    )
+    .join("\n\n");
 
   try {
-    const controller = timeoutSignal(5000);
+    const result =
+      await env.AI.run(
+        AI_MODEL,
+        {
+          messages: [
+            {
+              role: "system",
+              content:
+                "You write original neutral news articles for NowPulse. " +
+                "Use only supplied facts. Never invent names, dates, numbers, quotes or events. " +
+                "If sources conflict, clearly say reports differ. " +
+                "Never copy source wording. Write a complete readable article in Arabic with 5 to 8 paragraphs. " +
+                "Return plain text only."
+            },
+            {
+              role: "user",
+              content:
+                `Create a complete original Arabic news article from these sources:\n\n${sources}`
+            }
+          ],
+          max_tokens: 1800
+        }
+      );
 
-    const url =
-      `https://api.open-meteo.com/v1/forecast` +
-      `?latitude=${selected[0]}` +
-      `&longitude=${selected[1]}` +
-      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
-      `&timezone=auto`;
+    const output =
+      aiText(result).trim();
 
-    const response = await fetch(url, {
-      signal: controller.signal
-    });
-
-    controller.done();
-
-    const data = await response.json();
-
-    return {
-      city,
-      ar: selected[2],
-      en: selected[3],
-      ...(data.current || {})
-    };
+    return output ||
+      fallbackArticle(article);
   } catch {
-    return {
-      city,
-      ar: selected[2],
-      en: selected[3]
-    };
+    return fallbackArticle(article);
   }
 }
 
-function iconSvg(category) {
-  const icons = {
-    sports: "⚽",
-    economy: "▥",
-    politics: "▣",
-    tech: "⌘",
-    arts: "✦",
-    health: "✚",
-    travel: "✈",
-    world: "◎",
-    egypt: "𓂀",
-    latest: "✦",
-    trends: "⌁",
-    markets: "₿",
-    weather: "☁"
-  };
+async function searchNews(
+  env,
+  query
+) {
+  const q =
+    cleanText(query).slice(0, 120);
 
-  return `<span class="cat-icon" aria-hidden="true">${
-    icons[category] || "•"
-  }</span>`;
-}
+  if (!q) {
+    return [];
+  }
 
-function timeAgo(ms, lang) {
-  const difference = Math.max(0, Date.now() - ms);
-  const minutes = Math.floor(difference / 60000);
+  const key =
+    `search:${q.toLowerCase()}`;
 
-  if (lang === "ar") {
-    if (minutes < 1) return "الآن";
+  if (env.NOWPULSE_KV) {
+    const cached =
+      await env.NOWPULSE_KV
+        .get(key, "json")
+        .catch(() => null);
 
-    if (minutes < 60) {
-      return `منذ ${minutes} دقيقة`;
+    if (Array.isArray(cached)) {
+      return cached;
     }
-
-    const hours = Math.floor(minutes / 60);
-
-    if (hours < 24) {
-      return `منذ ${hours} ساعة`;
-    }
-
-    return `منذ ${Math.floor(hours / 24)} يوم`;
   }
 
-  if (minutes < 1) return "Now";
+  const urls = [
+    "https://news.google.com/rss/search" +
+      `?q=${encodeURIComponent(`${q} when:7d`)}` +
+      "&hl=ar&gl=EG&ceid=EG:ar",
 
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
+    "https://news.google.com/rss/search" +
+      `?q=${encodeURIComponent(`${q} when:7d`)}` +
+      "&hl=en&gl=US&ceid=US:en"
+  ];
 
-  const hours = Math.floor(minutes / 60);
+  const groups =
+    await Promise.all(
+      urls.map(async url => {
+        try {
+          const response =
+            await timeoutFetch(
+              url
+            );
 
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
+          if (!response.ok) {
+            return [];
+          }
 
-  return `${Math.floor(hours / 24)}d ago`;
-}
+          const xml =
+            await response.text();
 
-function card(article, lang, hero = false) {
-  const category =
-    CATEGORIES[article.category] || CATEGORIES.world;
-
-  const image =
-    article.originalImage ||
-    article.image ||
-    relevantImageUrl(
-      article.id,
-      article.title,
-      article.link
+          return xmlItems(xml).map(
+            item =>
+              normalizeArticle(
+                item,
+                classify(q, "world")
+              )
+          );
+        } catch {
+          return [];
+        }
+      })
     );
 
+  const map = new Map();
+
+  for (const group of groups) {
+    for (const article of group) {
+      if (!map.has(article.link)) {
+        map.set(
+          article.link,
+          article
+        );
+      }
+    }
+  }
+
+  const result =
+    [...map.values()]
+      .sort(
+        (a, b) =>
+          new Date(b.date) -
+          new Date(a.date)
+      )
+      .slice(0, 40);
+
+  if (env.NOWPULSE_KV) {
+    await env.NOWPULSE_KV
+      .put(
+        key,
+        JSON.stringify(result),
+        {
+          expirationTtl: 600
+        }
+      )
+      .catch(() => {});
+  }
+
+  return result;
+}
+
+async function markets(env) {
+  let cached = null;
+
+  if (env.NOWPULSE_KV) {
+    cached =
+      await env.NOWPULSE_KV
+        .get("markets", "json")
+        .catch(() => null);
+  }
+
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const response =
+      await timeoutFetch(
+        "https://api.frankfurter.app/latest?from=USD&to=EGP,EUR,GBP,CHF",
+        {},
+        5000
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Market source unavailable"
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const usdEgp =
+      Number(data.rates?.EGP || 0);
+
+    const result = {
+      updated:
+        new Date().toISOString(),
+
+      usdEgp,
+
+      eurEgp:
+        usdEgp &&
+        data.rates?.EUR
+          ? usdEgp /
+            Number(data.rates.EUR)
+          : 0,
+
+      gbpEgp:
+        usdEgp &&
+        data.rates?.GBP
+          ? usdEgp /
+            Number(data.rates.GBP)
+          : 0,
+
+      chfEgp:
+        usdEgp &&
+        data.rates?.CHF
+          ? usdEgp /
+            Number(data.rates.CHF)
+          : 0
+    };
+
+    if (env.NOWPULSE_KV) {
+      await env.NOWPULSE_KV
+        .put(
+          "markets",
+          JSON.stringify(result),
+          {
+            expirationTtl: 900
+          }
+        )
+        .catch(() => {});
+    }
+
+    return result;
+  } catch {
+    return (
+      cached || {
+        updated: null,
+        usdEgp: 0,
+        eurEgp: 0,
+        gbpEgp: 0,
+        chfEgp: 0
+      }
+    );
+  }
+}
+
+async function weather(
+  env,
+  city = "cairo"
+) {
+  const selected =
+    CITY_COORDS[city]
+      ? city
+      : "cairo";
+
+  const key =
+    `weather:${selected}`;
+
+  let cached = null;
+
+  if (env.NOWPULSE_KV) {
+    cached =
+      await env.NOWPULSE_KV
+        .get(key, "json")
+        .catch(() => null);
+  }
+
+  if (cached) {
+    return cached;
+  }
+
+  const [
+    latitude,
+    longitude
+  ] = CITY_COORDS[selected];
+
+  try {
+    const url =
+      "https://api.open-meteo.com/v1/forecast" +
+      `?latitude=${latitude}` +
+      `&longitude=${longitude}` +
+      "&current=temperature_2m,relative_humidity_2m,weather_code" +
+      "&timezone=auto";
+
+    const response =
+      await timeoutFetch(
+        url,
+        {},
+        5000
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Weather source unavailable"
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const result = {
+      city: selected,
+      temperature:
+        data.current?.temperature_2m,
+      humidity:
+        data.current
+          ?.relative_humidity_2m,
+      code:
+        data.current?.weather_code,
+      updated:
+        new Date().toISOString()
+    };
+
+    if (env.NOWPULSE_KV) {
+      await env.NOWPULSE_KV
+        .put(
+          key,
+          JSON.stringify(result),
+          {
+            expirationTtl: 900
+          }
+        )
+        .catch(() => {});
+    }
+
+    return result;
+  } catch {
+    return (
+      cached || {
+        city: selected,
+        temperature: null,
+        humidity: null,
+        code: null
+      }
+    );
+  }
+}
+
+function ageLabel(
+  date,
+  lang
+) {
+  const minutes =
+    Math.max(
+      0,
+      Math.floor(
+        (Date.now() -
+          new Date(date).getTime()) /
+          60000
+      )
+    );
+
+  if (lang === "en") {
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    }
+
+    if (minutes < 1440) {
+      return `${Math.floor(
+        minutes / 60
+      )}h ago`;
+    }
+
+    return `${Math.floor(
+      minutes / 1440
+    )}d ago`;
+  }
+
+  if (minutes < 60) {
+    return `منذ ${minutes} د`;
+  }
+
+  if (minutes < 1440) {
+    return `منذ ${Math.floor(
+      minutes / 60
+    )} س`;
+  }
+
+  return `منذ ${Math.floor(
+    minutes / 1440
+  )} يوم`;
+}
+
+function icon(category) {
+  return {
+    sports: "⚽",
+    economy: "📈",
+    politics: "🏛️",
+    tech: "⚡",
+    arts: "🎬",
+    health: "🩺",
+    travel: "✈️",
+    egypt: "🇪🇬",
+    world: "🌍",
+    trends: "🔥",
+    latest: "📰"
+  }[category] || "📰";
+}
+
+function card(
+  article,
+  lang,
+  featured = false
+) {
+  const title =
+    esc(article.title);
+
+  const summary =
+    esc(
+      article.description ||
+        article.title
+    );
+
+  const image =
+    article.image ||
+    `/api/image?id=${encodeURIComponent(
+      article.id
+    )}`;
+
   return `
-<article class="card ${hero ? "hero" : ""} tone-${category.tone}">
-<a href="/article/${article.id}?lang=${lang}">
-<div class="thumb">
-<img
-src="${attr(image)}"
-data-image-id="${attr(article.id)}"
-loading="${hero ? "eager" : "lazy"}"
-decoding="async"
-fetchpriority="${hero ? "high" : "auto"}"
-onerror="this.style.display='none';this.parentElement.classList.add('no-image')">
-<span>${iconSvg(article.category)}</span>
-</div>
+<article class="card ${featured ? "featured" : ""}">
+  <a
+    class="card-image"
+    href="/article/${encodeURIComponent(
+      article.id
+    )}?lang=${lang}"
+  >
+    <img
+      src="${esc(image)}"
+      loading="${featured ? "eager" : "lazy"}"
+      decoding="async"
+      width="900"
+      height="560"
+      alt=""
+    >
+  </a>
 
-<div class="card-body">
-<div class="meta">
-<b>${esc(category[lang])}</b>
-<span>${esc(article.source || "NowPulse")}</span>
-<time>${timeAgo(article.time, lang)}</time>
-</div>
+  <div class="card-body">
+    <div class="meta">
+      ${icon(article.category)}
+      ${esc(
+        CATEGORIES[
+          article.category
+        ]?.[lang] ||
+          CATEGORIES.world[lang]
+      )}
+      ·
+      ${ageLabel(
+        article.date,
+        lang
+      )}
+    </div>
 
-<h2>${esc(article.title)}</h2>
-<p>${esc(article.description)}</p>
-</div>
-</a>
+    <h2>
+      <a href="/article/${encodeURIComponent(
+        article.id
+      )}?lang=${lang}">
+        ${title}
+      </a>
+    </h2>
+
+    <p>${summary}</p>
+
+    <div class="source">
+      ${esc(article.source)}
+    </div>
+  </div>
 </article>`;
 }
 
-function quote() {
-  return `
-<section class="quote" id="quote">
-<strong>حكمة اليوم</strong>
-<span></span>
-</section>`;
-}
-
-function shell(
+function layout({
   lang,
   title,
-  description,
-  content,
-  options = {}
-) {
-  const ar = lang === "ar";
-  const canonical =
-    options.canonical || `${SITE}/?lang=${lang}`;
+  body,
+  active = "latest"
+}) {
+  const rtl =
+    lang === "ar";
 
-  const direction = ar ? "rtl" : "ltr";
+  const nav =
+    Object.entries(
+      CATEGORIES
+    )
+      .map(
+        ([key, value]) => `
+<a
+  class="nav-${key} ${
+          active === key
+            ? "active"
+            : ""
+        }"
+  href="/?lang=${lang}&category=${key}"
+>
+  ${icon(key)}
+  ${esc(value[lang])}
+</a>`
+      )
+      .join("");
 
-  return `<!doctype html>
-<html lang="${ar ? "ar" : "en"}" dir="${direction}">
+  return `
+<!doctype html>
+<html
+  lang="${lang}"
+  dir="${rtl ? "rtl" : "ltr"}"
+>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-
-<title>${esc(title)}</title>
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
+>
+<meta
+  name="theme-color"
+  content="#101827"
+>
+<title>${esc(title)} — NowPulse</title>
 
 <meta
-name="description"
-content="${attr(description)}">
+  name="description"
+  content="${esc(
+    lang === "ar"
+      ? "NowPulse منصة أخبار ومعلومات محدثة باستمرار."
+      : "NowPulse is a continuously updated news and information platform."
+  )}"
+>
 
-<link
-rel="canonical"
-href="${attr(canonical)}">
-
-<meta
-property="og:title"
-content="${attr(title)}">
-
-<meta
-property="og:description"
-content="${attr(description)}">
-
-<meta
-property="og:type"
-content="website">
-
-<meta
-property="og:url"
-content="${attr(canonical)}">
-
-<meta
-name="theme-color"
-content="#10141c">
-
-<style>${CSS}</style>
+<style>
+${CSS}
+</style>
 </head>
 
-<body class="${direction}">
+<body>
 
-<header class="top">
+<header>
+
+<div class="top">
 
 <a
-class="brand"
-href="/?lang=${lang}"
-aria-label="NowPulse">
-
-<span class="brand-mark">N</span>
-<span>NowPulse</span>
-
+  class="logo"
+  href="/?lang=${lang}"
+>
+  Now<span>Pulse</span>
 </a>
 
 <form
-class="search"
-action="/search"
-method="get">
+  action="/search"
+  method="get"
+>
+  <input
+    name="q"
+    placeholder="${
+      lang === "ar"
+        ? "ابحث عن شخص أو موضوع..."
+        : "Search a person or topic..."
+    }"
+    required
+  >
 
-<input
-name="q"
-placeholder="${
-    ar
-      ? "ابحث عن أي شخص أو موضوع…"
-      : "Search any person or topic…"
-  }"
-autocomplete="off">
+  <input
+    type="hidden"
+    name="lang"
+    value="${lang}"
+  >
 
-<input
-type="hidden"
-name="lang"
-value="${lang}">
-
-<button>⌕</button>
-
+  <button>🔎</button>
 </form>
 
-<nav class="top-actions">
+<div class="actions">
 
-<a href="?lang=${lang === "ar" ? "en" : "ar"}">
-${lang === "ar" ? "EN" : "عربي"}
+<a
+  href="?lang=${
+    lang === "ar"
+      ? "en"
+      : "ar"
+  }"
+>
+  ${
+    lang === "ar"
+      ? "EN"
+      : "ع"
+  }
 </a>
 
 <button
-onclick="toggleTheme()"
-aria-label="theme">
-☀️
+  onclick="toggleTheme()"
+  title="theme"
+>
+  ☀️
 </button>
 
-<button
-onclick="location.reload()"
-aria-label="refresh">
-↻
-</button>
+<a href="/">
+  ↻
+</a>
 
+</div>
+
+</div>
+
+<nav>
+${nav}
 </nav>
 
 </header>
 
-<nav class="nav">
-
-${Object.entries(CATEGORIES)
-  .filter(
-    ([key]) =>
-      !["markets", "weather", "latest"].includes(key)
-  )
-  .map(
-    ([key, value]) => `
-<a
-class="nav-${key}"
-href="/?category=${key}&lang=${lang}">
-${iconSvg(key)}
-<span>${value[lang]}</span>
-</a>`
-  )
-  .join("")}
-
-<a
-class="nav-trends"
-href="/?category=trends&lang=${lang}">
-${iconSvg("trends")}
-<span>${CATEGORIES.trends[lang]}</span>
-</a>
-
-</nav>
-
-${content}
+<main>
+${body}
+</main>
 
 <footer>
-Created by Taha · NowPulse ${VERSION}
+Created by Taha · NowPulse v${VERSION}
 </footer>
 
-<script>${CLIENT}</script>
+<script>
+${CLIENT}
+</script>
 
 </body>
 </html>`;
 }
 
-function trendArticles(feed) {
-  const scores = new Map();
-
-  for (const article of feed) {
-    const words = normalize(article.title)
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(
-        word =>
-          word.length >= 4 &&
-          !/^(the|and|from|with|this|that|news|latest|about|بعد|اليوم|الآن|خبر|اخبار)$/.test(
-            word
-          )
-      );
-
-    for (const word of words) {
-      scores.set(
-        word,
-        (scores.get(word) || 0) + 1
-      );
-    }
-  }
-
-  const top = [...scores.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 12)
-    .map(item => item[0]);
-
-  return feed
-    .filter(article =>
-      top.some(word =>
-        article.title.toLowerCase().includes(word)
-      )
-    )
-    .slice(0, 25);
-}
-
-async function home(env, lang, category) {
-  let feed = await getFeed(env);
-
-  if (
+function homeBody(
+  items,
+  lang,
+  category,
+  marketData,
+  weatherData
+) {
+  const filtered =
     category &&
-    category !== "latest" &&
-    category !== "trends"
-  ) {
-    feed = feed.filter(
-      article => article.category === category
-    );
-  }
+    category !== "latest"
+      ? items.filter(
+          article =>
+            article.category ===
+            category
+        )
+      : items;
 
-  if (category === "trends") {
-    feed = trendArticles(feed);
-  }
+  const list =
+    filtered.length
+      ? filtered
+      : items;
 
-  const featured = feed[0];
-  const rest = feed.slice(1, 25);
+  const featured =
+    list[0];
 
-  const dashboard = `
-<div class="dashboard">
+  const rest =
+    list.slice(1, 30);
 
-<section class="info-panel markets">
+  const quote =
+    QUOTES[0][lang];
 
-<div class="panel-head">
-<h2>${CATEGORIES.markets[lang]}</h2>
+  const market = `
+<section class="panel">
+  <h3>
+    💹
+    ${
+      lang === "ar"
+        ? "الأسواق"
+        : "Markets"
+    }
+  </h3>
 
-<a href="/markets?lang=${lang}">
-${lang === "ar" ? "عرض الكل" : "View all"}
-</a>
-</div>
+  <div class="market-grid">
 
-<div
-class="market-grid"
-id="market-grid">
+    <b>
+      USD/EGP
+      <br>
+      <span>
+        ${
+          marketData.usdEgp
+            ? marketData.usdEgp.toFixed(2)
+            : "—"
+        }
+      </span>
+    </b>
 
-<div>
-<small>Gold XAU/USD</small>
-<b>…</b>
-</div>
+    <b>
+      EUR/EGP
+      <br>
+      <span>
+        ${
+          marketData.eurEgp
+            ? marketData.eurEgp.toFixed(2)
+            : "—"
+        }
+      </span>
+    </b>
 
-<div>
-<small>USD / EGP</small>
-<b>…</b>
-</div>
+    <b>
+      GBP/EGP
+      <br>
+      <span>
+        ${
+          marketData.gbpEgp
+            ? marketData.gbpEgp.toFixed(2)
+            : "—"
+        }
+      </span>
+    </b>
 
-<div>
-<small>EUR / USD</small>
-<b>…</b>
-</div>
+  </div>
+</section>`;
 
-<div>
-<small>GBP / USD</small>
-<b>…</b>
-</div>
+  const weatherBox = `
+<section class="panel">
 
-</div>
-
-<small class="muted">
-${lang === "ar"
-      ? "جارٍ تحديث الأسعار…"
-      : "Updating prices…"}
-</small>
-
-</section>
-
-<section class="info-panel weather">
-
-<div class="panel-head">
-
-<h2>${CATEGORIES.weather[lang]}</h2>
-
-<select
-id="city"
-onchange="loadWeather(this.value)">
-
-${Object.entries(CITY)
-  .map(
-    ([key, value]) =>
-      `<option value="${key}">
-${value[lang === "ar" ? 2 : 3]}
-</option>`
-  )
-  .join("")}
-
-</select>
-
-</div>
-
-<div
-class="weather-main"
-id="weather-main">
-
-<span>☁︎</span>
-
-<b>…°</b>
-
-<small>
-${lang === "ar"
-      ? "جارٍ التحديث…"
-      : "Updating…"}
-</small>
-
-</div>
-
-</section>
-
-</div>`;
-
-  return shell(
-    lang,
-    category
-      ? CATEGORIES[category]?.[lang] || "NowPulse"
-      : "NowPulse",
-    lang === "ar"
-      ? "آخر الأخبار والمعلومات المحدثة"
-      : "Latest verified news and information",
-    `
-<main class="page">
-
-<div class="page-title">
-
-<div>
-
-<span class="eyebrow">
-NowPulse
-</span>
-
-<h1>
+<h3>
+🌤️
 ${
-  category && CATEGORIES[category]
-    ? CATEGORIES[category][lang]
-    : lang === "ar"
-    ? "آخر الأخبار"
-    : "Latest News"
+  lang === "ar"
+    ? "الطقس"
+    : "Weather"
 }
-</h1>
+</h3>
+
+<div id="weatherBox">
+
+${
+  weatherData.temperature ==
+  null
+    ? "—"
+    : `${weatherData.temperature}°C · ${weatherData.humidity}%`
+}
 
 </div>
 
-<span class="live">
-● LIVE
-</span>
+</section>`;
 
+  return `
+<section class="hero">
+
+<div>
+  <div class="eyebrow">
+    ${icon(category || "latest")}
+  </div>
+
+  <h1>
+    ${esc(
+      category
+        ? CATEGORIES[
+            category
+          ]?.[lang] ||
+            CATEGORIES.latest[
+              lang
+            ]
+        : CATEGORIES.latest[
+            lang
+          ]
+    )}
+  </h1>
 </div>
 
-${quote()}
+<div
+  class="quote"
+  id="quote"
+>
+${esc(quote)}
+</div>
 
-${dashboard}
+</section>
+
+<div class="dashboard">
+${market}
+${weatherBox}
+</div>
 
 ${
   featured
     ? `
 <section class="news-grid">
 
-<div class="featured">
-${card(featured, lang, true)}
+<div>
+${card(
+  featured,
+  lang,
+  true
+)}
 </div>
 
-<div class="feed">
-${rest.map(article => card(article, lang)).join("")}
+<div class="list">
+${rest
+  .map(article =>
+    card(
+      article,
+      lang
+    )
+  )
+  .join("")}
 </div>
 
 </section>`
@@ -1342,1579 +1458,1274 @@ ${rest.map(article => card(article, lang)).join("")}
 <div class="empty">
 ${
   lang === "ar"
-    ? "لا توجد أخبار حديثة مطابقة حاليًا."
-    : "No recent matching news is available."
+    ? "لا توجد أخبار حديثة حاليًا."
+    : "No recent stories are available."
 }
 </div>`
+}`;
 }
 
-</main>`
-  );
-}
+function articleBody(
+  article,
+  body,
+  lang
+) {
+  const paragraphs =
+    body
+      .split(/\n+/)
+      .filter(Boolean)
+      .map(
+        paragraph =>
+          `<p>${esc(
+            paragraph
+          )}</p>`
+      )
+      .join("");
 
-async function articlePage(env, id, lang) {
-  const article = await getArticle(env, id);
-
-  if (!article) {
-    return html("<h1>404</h1>", 404);
-  }
-
-  let image =
-    article.originalImage ||
+  const image =
     article.image ||
-    "";
+    `/api/image?id=${encodeURIComponent(
+      article.id
+    )}`;
 
-  if (!image && env.NOWPULSE_KV) {
-    try {
-      image =
-        (await env.NOWPULSE_KV.get(`img:${id}`)) ||
-        "";
-    } catch {}
-  }
+  return `
+<article class="article">
 
-  if (!image) {
-    image = relevantImageUrl(
-      id,
-      article.title,
-      article.link
-    );
-  }
-
-  const body = await writeArticle(
-    env,
-    article,
-    lang
-  );
-
-  const category =
-    CATEGORIES[article.category] ||
-    CATEGORIES.world;
-
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: article.title,
-    datePublished: new Date(
-      article.time
-    ).toISOString(),
-    dateModified: new Date(
-      article.time
-    ).toISOString(),
-    image: [image],
-    publisher: {
-      "@type": "Organization",
-      name: "NowPulse",
-      url: SITE
-    },
-    mainEntityOfPage:
-      `${SITE}/article/${article.id}?lang=${lang}`
-  };
-
-  return shell(
-    lang,
-    article.title,
-    article.description,
-    `
-<main class="article-page">
-
-<div class="article-kicker">
-${iconSvg(article.category)}
-${esc(category[lang])}
+<div class="meta">
+${icon(article.category)}
+${esc(
+  CATEGORIES[
+    article.category
+  ]?.[lang] ||
+    "News"
+)}
 ·
-${timeAgo(article.time, lang)}
+${ageLabel(
+  article.date,
+  lang
+)}
 </div>
 
 <h1>
 ${esc(article.title)}
 </h1>
 
-<div class="article-source">
-${esc(article.source || "NowPulse")}
+<div class="source">
+${esc(article.source)}
 </div>
-
-<figure class="article-image">
 
 <img
-src="${attr(image)}"
-onerror="this.style.display='none'">
+  class="article-image"
+  src="${esc(image)}"
+  loading="eager"
+  width="1200"
+  height="750"
+  alt=""
+>
 
-<figcaption>
-${
-  lang === "ar"
-    ? "صورة مرتبطة بالخبر"
-    : "Image related to the story"
-}
-</figcaption>
-
-</figure>
-
-<div class="article-body">
-${body}
+<div class="article-text">
+${paragraphs}
 </div>
 
-<div class="article-note">
+<div class="article-updated">
 ${
   lang === "ar"
-    ? "تمت صياغة المقال داخل NowPulse اعتمادًا على المعلومات المتاحة من المصادر التي تم جمعها للخبر، دون نسخ نص المصدر."
-    : "This article was written inside NowPulse from the available collected source facts and is not copied from a publisher."
+    ? "آخر تحديث للمادة"
+    : "Article update"
 }
-</div>
-
-</main>`,
-    {
-      canonical:
-        `${SITE}/article/${article.id}?lang=${lang}`
-    }
-  ).replace(
-    "</head>",
-    `<script type="application/ld+json">${JSON.stringify(
-      structuredData
-    ).replace(/</g, "\\u003c")}</script></head>`
-  );
-}
-
-async function searchPage(env, query, lang) {
-  const rows = await searchNews(env, query);
-
-  return shell(
-    lang,
-    `${query} · NowPulse`,
+:
+${esc(
+  new Date().toLocaleString(
     lang === "ar"
-      ? `نتائج البحث عن ${query}`
-      : `Search results for ${query}`,
-    `
-<main class="page">
-
-<div class="page-title">
-
-<div>
-
-<span class="eyebrow">
-NowPulse Search
-</span>
-
-<h1>
-${
-  lang === "ar"
-    ? "نتائج البحث"
-    : "Search results"
-}
-</h1>
-
-<p>
-${esc(query)}
-</p>
-
+      ? "ar-EG"
+      : "en-US"
+  )
+)}
 </div>
 
-</div>
-
-<div class="search-results">
-
-${
-  rows.length
-    ? rows.map(article => card(article, lang)).join("")
-    : `
-<div class="empty">
-${
-  lang === "ar"
-    ? "لم نجد أخبارًا حديثة مطابقة. جرّب اسمًا أو موضوعًا آخر."
-    : "No recent matching stories were found. Try another person or topic."
-}
-</div>`
-}
-
-</div>
-
-</main>`
-  );
+</article>`;
 }
 
 const CSS = `
 :root{
---bg:#f5f7fb;
---surface:#fff;
---text:#111827;
---muted:#667085;
---line:#e5e7eb;
---accent:#2563eb;
---shadow:0 10px 30px rgba(15,23,42,.07)
+  --bg:#f5f7fb;
+  --panel:#ffffff;
+  --text:#111827;
+  --muted:#667085;
+  --line:#e6eaf0;
+  --accent:#0b63f6;
+  --header:#101827;
 }
 
 *{
-box-sizing:border-box
-}
-
-html{
-scroll-behavior:smooth
+  box-sizing:border-box;
 }
 
 body{
-margin:0;
-background:var(--bg);
-color:var(--text);
-font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+}
+
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+header{
+  position:sticky;
+  top:0;
+  z-index:10;
+  background:rgba(16,24,39,.97);
+  color:#fff;
+  box-shadow:
+    0 2px 16px #0002;
 }
 
 .top{
-height:72px;
-display:grid;
-grid-template-columns:auto minmax(300px,720px) auto;
-gap:24px;
-align-items:center;
-padding:0 5%;
-background:var(--surface);
-border-bottom:1px solid var(--line);
-position:sticky;
-top:0;
-z-index:20
+  max-width:1450px;
+  margin:auto;
+  display:flex;
+  gap:18px;
+  align-items:center;
+  padding:13px 20px;
 }
 
-.brand{
-display:flex;
-align-items:center;
-gap:10px;
-color:var(--text);
-font-size:24px;
-font-weight:900;
-text-decoration:none
+.logo{
+  font-size:27px;
+  font-weight:900;
+  letter-spacing:-1px;
+  white-space:nowrap;
 }
 
-.brand-mark{
-width:38px;
-height:38px;
-border-radius:12px;
-display:grid;
-place-items:center;
-background:linear-gradient(135deg,#111827,#2563eb);
-color:white
+.logo span{
+  color:#45a3ff;
 }
 
-.search{
-display:flex;
-border:1px solid var(--line);
-background:var(--bg);
-border-radius:14px;
-overflow:hidden
+form{
+  display:flex;
+  flex:1;
+  max-width:700px;
+  margin:auto;
 }
 
-.search input{
-min-width:0;
-flex:1;
-border:0;
-background:transparent;
-padding:12px 15px;
-font-size:15px;
-outline:0
+form input{
+  min-width:0;
+  flex:1;
+  border:0;
+  border-radius:
+    12px 0 0 12px;
+  padding:12px 15px;
+  font-size:15px;
+  outline:0;
 }
 
-.search button{
-border:0;
-background:var(--text);
-color:white;
-width:48px;
-font-size:22px
+form button{
+  border:0;
+  padding:0 17px;
+  border-radius:
+    0 12px 12px 0;
+  background:#1677ff;
+  color:#fff;
+  font-size:18px;
 }
 
-.top-actions{
-display:flex;
-gap:8px;
-align-items:center
+.actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
 }
 
-.top-actions a,
-.top-actions button{
-border:1px solid var(--line);
-background:var(--surface);
-color:var(--text);
-padding:9px 11px;
-border-radius:10px;
-text-decoration:none;
-cursor:pointer
+.actions a,
+.actions button{
+  background:#ffffff18;
+  border:1px solid #ffffff22;
+  color:#fff;
+  padding:8px 10px;
+  border-radius:9px;
 }
 
-.nav{
-display:flex;
-gap:8px;
-padding:12px 5%;
-background:var(--surface);
-border-bottom:1px solid var(--line);
-overflow:auto;
-scrollbar-width:none
+.actions button{
+  cursor:pointer;
 }
 
-.nav a{
-white-space:nowrap;
-text-decoration:none;
-color:var(--muted);
-font-weight:700;
-padding:9px 12px;
-border-radius:12px;
-display:flex;
-align-items:center;
-gap:7px
+nav{
+  max-width:1450px;
+  margin:auto;
+  display:flex;
+  gap:5px;
+  overflow:auto;
+  padding:
+    0 20px 10px;
+  scrollbar-width:none;
 }
 
-.nav a:hover{
-background:var(--bg);
-color:var(--text)
+nav a{
+  white-space:nowrap;
+  padding:8px 11px;
+  border-radius:9px;
+  color:#cbd5e1;
+  font-size:14px;
 }
 
-.cat-icon{
-font-size:1.05em;
-font-weight:900
+nav a.active,
+nav a:hover{
+  background:#ffffff15;
+  color:#fff;
 }
 
-.page{
-max-width:1380px;
-margin:auto;
-padding:32px 5% 60px
-}
-
-.page-title{
-display:flex;
-justify-content:space-between;
-align-items:end;
-gap:20px;
-margin-bottom:20px
-}
-
-.eyebrow{
-color:var(--accent);
-font-weight:800;
-font-size:13px;
-text-transform:uppercase;
-letter-spacing:.08em
-}
-
-.page-title h1{
-font-size:42px;
-margin:5px 0 0;
-line-height:1.05
-}
-
-.page-title p{
-color:var(--muted);
-margin:8px 0
-}
-
-.live{
-color:#dc2626;
-font-weight:900
-}
-
-.quote{
-display:flex;
-justify-content:space-between;
-gap:20px;
-align-items:center;
-background:linear-gradient(135deg,#111827,#243b64);
-color:white;
-border-radius:18px;
-padding:18px 22px;
-margin-bottom:18px;
-min-height:68px
-}
-
-.quote strong{
-font-size:13px;
-opacity:.75
-}
-
-.quote span{
-font-size:17px;
-font-weight:700
-}
-
-.dashboard{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:16px;
-margin-bottom:20px
-}
-
-.info-panel{
-background:var(--surface);
-border:1px solid var(--line);
-border-radius:18px;
-padding:18px;
-box-shadow:var(--shadow)
-}
-
-.panel-head{
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:10px
-}
-
-.panel-head h2{
-font-size:18px;
-margin:0
-}
-
-.panel-head a,
-.panel-head select{
-border:0;
-background:var(--bg);
-color:var(--text);
-padding:7px 10px;
-border-radius:9px;
-text-decoration:none
-}
-
-.market-grid{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:10px;
-margin-top:14px
-}
-
-.market-grid div{
-padding:12px;
-border-radius:12px;
-background:var(--bg)
-}
-
-.market-grid small,
-.weather small{
-display:block;
-color:var(--muted)
-}
-
-.market-grid b{
-display:block;
-margin-top:5px
-}
-
-.muted{
-color:var(--muted);
-display:block;
-margin-top:10px
-}
-
-.weather-main{
-display:flex;
-align-items:center;
-gap:16px;
-margin-top:12px
-}
-
-.weather-main span{
-font-size:38px
-}
-
-.weather-main b{
-font-size:32px
-}
-
-.news-grid{
-display:grid;
-grid-template-columns:minmax(0,1.15fr) minmax(0,1.85fr);
-gap:18px;
-align-items:start
-}
-
-.feed{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:16px
-}
-
-.card{
-background:var(--surface);
-border:1px solid var(--line);
-border-radius:18px;
-overflow:hidden;
-box-shadow:var(--shadow);
-transition:transform .15s ease,box-shadow .15s ease
-}
-
-.card:hover{
-transform:translateY(-2px);
-box-shadow:0 15px 36px rgba(15,23,42,.1)
-}
-
-.card a{
-color:inherit;
-text-decoration:none
-}
-
-.thumb{
-aspect-ratio:16/9;
-background:linear-gradient(135deg,#dbeafe,#eef2ff);
-position:relative;
-overflow:hidden
-}
-
-.thumb img{
-width:100%;
-height:100%;
-object-fit:cover;
-display:block
-}
-
-.thumb>span{
-position:absolute;
-inset:10px auto auto 10px;
-width:34px;
-height:34px;
-border-radius:10px;
-display:grid;
-place-items:center;
-background:rgba(255,255,255,.9);
-color:#111827
-}
-
-.card-body{
-padding:15px
-}
-
-.meta{
-display:flex;
-gap:8px;
-align-items:center;
-color:var(--muted);
-font-size:11px;
-margin-bottom:9px
-}
-
-.meta b{
-padding:4px 7px;
-border-radius:7px;
-background:#eff6ff;
-color:var(--accent)
-}
-
-.meta span{
-overflow:hidden;
-text-overflow:ellipsis;
-white-space:nowrap
-}
-
-.meta time{
-margin-inline-start:auto;
-white-space:nowrap
-}
-
-.card h2{
-font-size:18px;
-line-height:1.35;
-margin:0 0 8px
-}
-
-.card p{
-color:var(--muted);
-font-size:13px;
-line-height:1.65;
-margin:0
+main{
+  max-width:1450px;
+  margin:auto;
+  padding:24px 20px;
 }
 
 .hero{
-position:sticky;
-top:145px
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  align-items:end;
+  margin-bottom:20px;
 }
 
-.hero .thumb{
-aspect-ratio:16/10
+.hero h1{
+  font-size:42px;
+  margin:5px 0;
 }
 
-.hero h2{
-font-size:27px
+.eyebrow{
+  font-size:30px;
 }
 
-.tone-sports .thumb{
-background:linear-gradient(135deg,#ffe4e6,#fff1f2)
+.quote{
+  max-width:430px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:18px;
+  font-weight:700;
+  color:var(--muted);
 }
 
-.tone-economy .thumb{
-background:linear-gradient(135deg,#d1fae5,#ecfdf5)
+.dashboard{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+  margin-bottom:20px;
 }
 
-.tone-politics .thumb{
-background:linear-gradient(135deg,#ede9fe,#f5f3ff)
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:18px;
 }
 
-.tone-tech .thumb{
-background:linear-gradient(135deg,#dbeafe,#eff6ff)
+.panel h3{
+  margin:
+    0 0 12px;
 }
 
-.tone-arts .thumb{
-background:linear-gradient(135deg,#fce7f3,#fdf2f8)
+.market-grid{
+  display:grid;
+  grid-template-columns:
+    repeat(3,1fr);
+  gap:10px;
 }
 
-.tone-health .thumb{
-background:linear-gradient(135deg,#fee2e2,#fff1f2)
+.market-grid b{
+  background:var(--bg);
+  padding:12px;
+  border-radius:12px;
 }
 
-.tone-travel .thumb{
-background:linear-gradient(135deg,#cffafe,#ecfeff)
+.market-grid span{
+  font-size:20px;
 }
 
-.tone-world .thumb{
-background:linear-gradient(135deg,#e2e8f0,#f8fafc)
+.news-grid{
+  display:grid;
+  grid-template-columns:
+    minmax(0,1.2fr)
+    minmax(0,1fr);
+  gap:20px;
 }
 
-.article-page{
-max-width:940px;
-margin:auto;
-padding:48px 5% 70px
+.list{
+  display:grid;
+  gap:14px;
 }
 
-.article-kicker{
-color:var(--accent);
-font-weight:800;
-margin-bottom:14px
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:
+    220px 1fr;
+  min-width:0;
 }
 
-.article-page>h1{
-font-size:48px;
-line-height:1.15;
-margin:0 0 10px
+.card.featured{
+  display:block;
 }
 
-.article-source{
-color:var(--muted);
-margin-bottom:24px
+.card-image{
+  display:block;
+  background:#e9edf3;
+  aspect-ratio:16/10;
+  overflow:hidden;
+}
+
+.card-image img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.card-body{
+  padding:15px;
+}
+
+.meta{
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:7px;
+}
+
+.card h2{
+  font-size:19px;
+  line-height:1.35;
+  margin:
+    0 0 8px;
+}
+
+.featured h2{
+  font-size:28px;
+}
+
+.card p{
+  color:var(--muted);
+  line-height:1.55;
+  margin:
+    0 0 10px;
+}
+
+.source,
+.article-updated{
+  font-size:12px;
+  color:var(--muted);
+}
+
+.article{
+  max-width:900px;
+  margin:auto;
+  background:var(--panel);
+  padding:25px;
+  border-radius:22px;
+  border:1px solid var(--line);
+}
+
+.article h1{
+  font-size:42px;
+  line-height:1.2;
+  margin:8px 0;
 }
 
 .article-image{
-margin:0 0 30px
+  width:100%;
+  height:auto;
+  aspect-ratio:16/10;
+  object-fit:cover;
+  border-radius:16px;
+  margin:20px 0;
 }
 
-.article-image img{
-width:100%;
-max-height:560px;
-object-fit:cover;
-border-radius:20px;
-display:block
+.article-text{
+  font-size:19px;
+  line-height:1.9;
 }
 
-.article-image figcaption{
-font-size:12px;
-color:var(--muted);
-padding-top:7px
-}
-
-.article-body{
-font-size:19px;
-line-height:1.95
-}
-
-.article-body h2{
-font-size:26px;
-margin-top:32px
-}
-
-.article-body p{
-margin:0 0 18px
-}
-
-.article-note{
-margin-top:35px;
-border-top:1px solid var(--line);
-padding-top:15px;
-color:var(--muted);
-font-size:12px
-}
-
-.search-results{
-display:grid;
-grid-template-columns:repeat(3,1fr);
-gap:16px
+.article-text p{
+  margin:
+    0 0 20px;
 }
 
 .empty{
-padding:60px 20px;
-text-align:center;
-background:var(--surface);
-border:1px dashed var(--line);
-border-radius:18px;
-color:var(--muted)
+  padding:50px;
+  text-align:center;
+  background:var(--panel);
+  border-radius:18px;
 }
 
 footer{
-text-align:center;
-padding:28px;
-color:var(--muted);
-font-size:12px;
-border-top:1px solid var(--line)
+  text-align:center;
+  color:var(--muted);
+  padding:35px 20px;
 }
 
 body.dark{
---bg:#0b0f15;
---surface:#121821;
---text:#f3f4f6;
---muted:#9ca3af;
---line:#263241;
---accent:#60a5fa
+  --bg:#0b1220;
+  --panel:#111a2a;
+  --text:#eef2f7;
+  --muted:#9aa7b7;
+  --line:#263246;
 }
 
-body.dark .thumb>span{
-background:rgba(18,24,33,.88);
-color:white
-}
-
-body.dark .brand-mark{
-background:linear-gradient(135deg,#e5e7eb,#2563eb);
-color:#0b0f15
+.dark .market-grid b{
+  background:#182236;
 }
 
 @media(max-width:1050px){
 
-.top{
-grid-template-columns:auto 1fr auto
-}
+  .hero h1{
+    font-size:34px;
+  }
 
-.news-grid{
-grid-template-columns:1fr
-}
+  .news-grid{
+    grid-template-columns:1fr;
+  }
 
-.hero{
-position:relative;
-top:auto
-}
+  .card.featured{
+    display:grid;
+    grid-template-columns:300px 1fr;
+  }
 
-.search-results{
-grid-template-columns:1fr 1fr
-}
-
+  .featured .card-image{
+    aspect-ratio:auto;
+    min-height:220px;
+  }
 }
 
 @media(max-width:700px){
 
-.top{
-height:auto;
-grid-template-columns:1fr auto;
-gap:10px;
-padding:10px 14px
-}
+  .top{
+    padding:10px 12px;
+    gap:8px;
+    flex-wrap:wrap;
+  }
 
-.brand{
-font-size:20px
-}
+  .logo{
+    font-size:23px;
+  }
 
-.brand-mark{
-width:34px;
-height:34px
-}
+  .top form{
+    order:3;
+    flex-basis:100%;
+    max-width:none;
+  }
 
-.search{
-grid-column:1/-1;
-grid-row:2
-}
+  nav{
+    padding:
+      0 10px 8px;
+  }
 
-.top-actions{
-grid-column:2;
-grid-row:1
-}
+  nav a{
+    font-size:13px;
+    padding:7px 9px;
+  }
 
-.top-actions a{
-font-size:12px
-}
+  main{
+    padding:15px 11px;
+  }
 
-.top-actions button{
-padding:8px
-}
+  .hero{
+    display:block;
+  }
 
-.nav{
-padding:9px 12px
-}
+  .hero h1{
+    font-size:30px;
+  }
 
-.nav a{
-padding:8px 10px;
-background:var(--bg)
-}
+  .quote{
+    margin-top:12px;
+  }
 
-.page{
-padding:20px 12px 45px
-}
+  .dashboard{
+    grid-template-columns:1fr;
+  }
 
-.page-title h1{
-font-size:31px
-}
+  .market-grid{
+    grid-template-columns:
+      1fr 1fr 1fr;
+  }
 
-.dashboard{
-grid-template-columns:1fr
-}
+  .news-grid{
+    display:block;
+  }
 
-.market-grid{
-grid-template-columns:1fr 1fr
-}
+  .card,
+  .card.featured{
+    display:grid;
+    grid-template-columns:
+      135px 1fr;
+    margin-bottom:12px;
+    border-radius:14px;
+  }
 
-.feed{
-grid-template-columns:1fr
-}
+  .card-image{
+    aspect-ratio:1/1;
+  }
 
-.card .thumb{
-aspect-ratio:1.55
-}
+  .card-body{
+    padding:11px;
+  }
 
-.hero .thumb{
-aspect-ratio:1.5
-}
+  .card h2,
+  .featured h2{
+    font-size:16px;
+  }
 
-.hero h2{
-font-size:23px
-}
+  .card p{
+    font-size:13px;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
 
-.card h2{
-font-size:17px
-}
+  .meta{
+    font-size:11px;
+  }
 
-.card p{
-font-size:12px
-}
+  .article{
+    padding:16px;
+    border-radius:15px;
+  }
 
-.meta{
-font-size:10px
-}
+  .article h1{
+    font-size:29px;
+  }
 
-.quote{
-display:block;
-padding:15px
-}
+  .article-text{
+    font-size:17px;
+    line-height:1.8;
+  }
 
-.quote span{
-display:block;
-margin-top:7px;
-font-size:14px
-}
+  .actions{
+    margin-left:auto;
+  }
 
-.search-results{
-grid-template-columns:1fr
-}
-
-.article-page{
-padding:28px 14px 50px
-}
-
-.article-page>h1{
-font-size:32px
-}
-
-.article-body{
-font-size:17px;
-line-height:1.85
-}
-
-.article-image img{
-border-radius:14px;
-max-height:420px
-}
-
+  .actions a,
+  .actions button{
+    padding:7px 8px;
+  }
 }
 `;
 
-const CLIENT = (() => {
-  const quotes = JSON.stringify(QUOTES);
+const CLIENT = `
+(function(){
+
+  const key =
+    "np-theme";
+
+  if(
+    localStorage.getItem(key) ===
+    "dark"
+  ){
+    document.body.classList.add(
+      "dark"
+    );
+  }
+
+  window.toggleTheme =
+    function(){
+
+      document.body.classList.toggle(
+        "dark"
+      );
+
+      localStorage.setItem(
+        key,
+        document.body.classList.contains(
+          "dark"
+        )
+          ? "dark"
+          : "light"
+      );
+
+    };
+
+  const quote =
+    document.getElementById(
+      "quote"
+    );
+
+  const quotes =
+    ${JSON.stringify(QUOTES)};
+
+  if(quote){
+
+    let index = 0;
+
+    setInterval(
+      function(){
+
+        index =
+          (index + 1) %
+          quotes.length;
+
+        quote.textContent =
+          document.documentElement
+            .lang === "ar"
+            ? quotes[index].ar
+            : quotes[index].en;
+
+      },
+      30000
+    );
+  }
+
+})();
+`;
+
+async function findArticle(
+  env,
+  id
+) {
+  const latest =
+    env.NOWPULSE_KV
+      ? await env.NOWPULSE_KV
+          .get(
+            "feed:latest",
+            "json"
+          )
+          .catch(() => [])
+      : [];
+
+  const archive =
+    env.NOWPULSE_KV
+      ? await env.NOWPULSE_KV
+          .get(
+            "feed:archive",
+            "json"
+          )
+          .catch(() => [])
+      : [];
 
   return [
-    "(function(){",
-    'var k="np-theme",root=document.body;',
-    'if(localStorage.getItem(k)==="dark")root.classList.add("dark");',
-    'window.toggleTheme=function(){root.classList.toggle("dark");localStorage.setItem(k,root.classList.contains("dark")?"dark":"light")};',
+    ...(Array.isArray(latest)
+      ? latest
+      : []),
+    ...(Array.isArray(archive)
+      ? archive
+      : [])
+  ].find(
+    article =>
+      article.id === id ||
+      article.link === id
+  ) || null;
+}
 
-    'var q=document.querySelector("#quote span");',
+async function imageEndpoint(
+  request,
+  env
+) {
+  const url =
+    new URL(request.url);
 
-    "if(q){",
-    "var a=",
-    quotes,
-    ";",
-    "var i=Math.floor(Date.now()/30000)%a.length;",
-    'var draw=function(){q.textContent=a[i][1];i=(i+1)%a.length};',
-    "draw();",
-    "setInterval(draw,30000)",
-    "}",
+  const id =
+    url.searchParams.get("id") ||
+    "";
 
-    'window.loadWeather=async function(city){',
-    "try{",
-    'var lang=document.documentElement.lang;',
-    'var r=await fetch("/api/weather?city="+encodeURIComponent(city)+"&lang="+lang);',
-    "var x=await r.json(),b=document.querySelector('#weather-main');",
-    'if(b&&x.temperature_2m!=null)b.innerHTML="<span>☀︎</span><b>"+Math.round(x.temperature_2m)+"°</b><small>"+(x[lang==="ar"?"ar":"en"]||"")+" · "+(x.relative_humidity_2m??"—")+"%</small>";',
-    "}catch(e){}",
-    "};",
-
-    'fetch("/api/markets")',
-    ".then(function(r){return r.json()})",
-    ".then(function(m){",
-    'var g=document.querySelector("#market-grid");',
-    "if(!g)return;",
-    'g.innerHTML="<div><small>Gold XAU/USD</small><b>"+(m.gold?"$"+m.gold.toFixed(2):"—")+"</b></div><div><small>USD / EGP</small><b>"+(m.fx&&m.fx.EGP?m.fx.EGP.toFixed(2):"—")+"</b></div><div><small>EUR / USD</small><b>"+(m.fx&&m.fx.EUR?m.fx.EUR.toFixed(4):"—")+"</b></div><div><small>GBP / USD</small><b>"+(m.fx&&m.fx.GBP?m.fx.GBP.toFixed(4):"—")+"</b></div>";',
-    "})",
-    ".catch(function(){});",
-
-    "window.loadWeather('cairo');",
-
-    "})();"
-  ].join("");
-})();
-
-async function imageEndpoint(env, id, request) {
-  let article = await getArticle(env, id);
-
-  const requestUrl = new URL(request.url);
+  const article =
+    await findArticle(
+      env,
+      id
+    );
 
   if (!article) {
-    const title =
-      requestUrl.searchParams.get("title") || "";
-
-    const link =
-      requestUrl.searchParams.get("url") || "";
-
-    if (title || link) {
-      article = {
-        id,
-        title,
-        link,
-        description: "",
-        source: "",
-        time: Date.now(),
-        category: classify(title),
-        originalImage: "",
-        image: ""
-      };
-    }
+    return new Response(
+      "",
+      { status:404 }
+    );
   }
 
-  if (!article) {
-    return new Response("", { status: 404 });
-  }
+  const key =
+    `img:${article.id}`;
+
+  let cached = null;
 
   if (env.NOWPULSE_KV) {
-    try {
-      const cached =
-        await env.NOWPULSE_KV.get(`img:${id}`);
-
-      if (cached) {
-        return Response.redirect(cached, 302);
-      }
-    } catch {}
+    cached =
+      await env.NOWPULSE_KV
+        .get(key)
+        .catch(() => null);
   }
 
-  const image = await resolveImage(
-    env,
-    article
+  const image =
+    cached ||
+    await extractImage(
+      article
+    );
+
+  if (image &&
+      env.NOWPULSE_KV) {
+
+    await env.NOWPULSE_KV
+      .put(
+        key,
+        image,
+        {
+          expirationTtl:
+            7 * 24 * 60 * 60
+        }
+      )
+      .catch(() => {});
+  }
+
+  if (!image) {
+    return new Response(
+      "",
+      { status:404 }
+    );
+  }
+
+  return Response.redirect(
+    image,
+    302
   );
-
-  if (image) {
-    await storeImage(env, id, image);
-
-    return Response.redirect(image, 302);
-  }
-
-  return new Response("", {
-    status: 404
-  });
 }
 
-async function sitemap(env) {
-  const feed = await getFeed(env);
+async function sitemap(
+  env
+) {
+  const latest =
+    env.NOWPULSE_KV
+      ? await env.NOWPULSE_KV
+          .get(
+            "feed:latest",
+            "json"
+          )
+          .catch(() => [])
+      : [];
 
-  const urls = [
-    `${SITE}/`,
-    `${SITE}/search`,
-    `${SITE}/about`,
-    `${SITE}/privacy`,
-    `${SITE}/terms`,
-    `${SITE}/contact`
+  const archive =
+    env.NOWPULSE_KV
+      ? await env.NOWPULSE_KV
+          .get(
+            "feed:archive",
+            "json"
+          )
+          .catch(() => [])
+      : [];
+
+  const all = [
+    ...(Array.isArray(latest)
+      ? latest
+      : []),
+    ...(Array.isArray(archive)
+      ? archive
+      : [])
   ];
 
-  for (const article of feed) {
-    urls.push(
-      `${SITE}/article/${article.id}?lang=ar`
-    );
-  }
+  const map =
+    new Map();
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
-  .map(
-    url => `<url><loc>${esc(url)}</loc></url>`
-  )
-  .join("")}
-</urlset>`;
-}
-
-function staticPage(lang, type) {
-  const ar = lang === "ar";
-
-  const texts = {
-    about: ar
-      ? [
-          "عن NowPulse",
-          "NowPulse منصة معلومات وأخبار تجمع الأخبار الحديثة من مصادر متعددة، وتعيد تنظيمها وصياغة المقالات داخل المنصة مع الحفاظ على التحقق من الحقائق."
-        ]
-      : [
-          "About NowPulse",
-          "NowPulse is a news and information platform that collects recent stories from multiple sources and presents readable original articles inside the platform."
-        ],
-
-    privacy: ar
-      ? [
-          "الخصوصية",
-          "نحترم خصوصية الزوار. قد نستخدم ملفات التخزين المحلية والتقنيات اللازمة لتشغيل الموقع وتحسين الأداء. لا نطلب بيانات شخصية لمجرد قراءة الأخبار."
-        ]
-      : [
-          "Privacy",
-          "We respect visitor privacy. Local storage and essential technologies may be used to operate and improve the site. Reading news does not require personal information."
-        ],
-
-    terms: ar
-      ? [
-          "الشروط",
-          "المحتوى المعلوماتي في NowPulse مقدم لأغراض المعرفة والإطلاع. يجب الرجوع إلى المصادر الرسمية عند اتخاذ قرارات مهمة."
-        ]
-      : [
-          "Terms",
-          "NowPulse provides information for reading and general knowledge. Consult official sources for important decisions."
-        ],
-
-    contact: ar
-      ? [
-          "اتصل بنا",
-          "للتواصل مع NowPulse استخدم قنوات المشروع المرتبطة بالموقع."
-        ]
-      : [
-          "Contact",
-          "For contact information, use the project channels associated with NowPulse."
-        ]
-  };
-
-  const [heading, paragraph] = texts[type];
-
-  return shell(
-    lang,
-    heading,
-    paragraph,
-    `
-<main class="article-page">
-
-<h1>
-${esc(heading)}
-</h1>
-
-<div class="article-body">
-
-<p>
-${esc(paragraph)}
-</p>
-
-</div>
-
-</main>`
-  );
-}
-
-async function diagnostics(env) {
-  const result = {
-    version: VERSION,
-    ai: Boolean(env.AI),
-    kv: Boolean(env.NOWPULSE_KV),
-    aiModel:
-      env.NOWPULSE_AI_MODEL || AI_MODEL,
-    autoRepair:
-      env.NOWPULSE_AUTO_REPAIR === "enabled",
-    time: new Date().toISOString()
-  };
-
-  if (env.AI) {
-    const response = await ai(
-      env,
-      [
-        {
-          role: "system",
-          content: "Reply with only OK."
-        },
-        {
-          role: "user",
-          content: "Health check"
-        }
-      ],
-      20
-    );
-
-    result.aiOk = Boolean(response);
-  }
-
-  return result;
-}
-
-async function autonomousRepair(
-  env,
-  ctx,
-  errorText
-) {
-  if (
-    env.NOWPULSE_AUTO_REPAIR !== "enabled" ||
-    !env.GITHUB_TOKEN
-  ) {
-    return {
-      ok: false,
-      reason: "disabled"
-    };
-  }
-
-  try {
-    const repo =
-      env.NOWPULSE_GITHUB_REPO ||
-      "Taha8880/NowPulse";
-
-    const branch =
-      env.NOWPULSE_GITHUB_BRANCH ||
-      "main";
-
-    const source = await github(
-      env,
-      `/repos/${repo}/contents/src/worker.js?ref=${encodeURIComponent(
-        branch
-      )}`
-    );
-
-    const current = decodeBase64(
-      source.content
-    );
-
-    const replacement = await ai(
-      env,
-      [
-        {
-          role: "system",
-          content:
-            "You are the autonomous maintenance engineer for NowPulse. " +
-            "Diagnose the supplied Worker error. " +
-            "Return ONLY a complete replacement src/worker.js. " +
-            "Preserve working functionality. " +
-            "Never add secrets. " +
-            "Never use browser globals in server code. " +
-            "Use the active Cloudflare Workers AI fast model. " +
-            "Keep the code syntactically valid JavaScript."
-        },
-        {
-          role: "user",
-          content:
-            `ERROR:\n${errorText}\n\nCURRENT SOURCE:\n${current}`
-        }
-      ],
-      3500
-    );
-
-    const candidate =
-      extractCode(replacement);
-
-    if (
-      !candidate ||
-      candidate.length < 5000
-    ) {
-      return {
-        ok: false,
-        reason:
-          "AI did not return a safe replacement"
-      };
+  for (const article of all) {
+    if (!map.has(article.id)) {
+      map.set(
+        article.id,
+        article
+      );
     }
-
-    const branchName =
-      `ai-repair-${Date.now()}`;
-
-    const ref = await github(
-      env,
-      `/repos/${repo}/git/ref/heads/${branch}`
-    );
-
-    await github(
-      env,
-      `/repos/${repo}/git/refs`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ref: `refs/heads/${branchName}`,
-          sha: ref.object.sha
-        })
-      }
-    );
-
-    await github(
-      env,
-      `/repos/${repo}/contents/src/worker.js`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          message:
-            "chore(ai): repair NowPulse automatically",
-          content: encodeBase64(candidate),
-          sha: source.sha,
-          branch: branchName
-        })
-      }
-    );
-
-    const workflow =
-      env.NOWPULSE_DEPLOY_WORKFLOW ||
-      "deploy.yml";
-
-    await github(
-      env,
-      `/repos/${repo}/actions/workflows/${workflow}/dispatches`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ref: branchName
-        })
-      }
-    );
-
-    return {
-      ok: true,
-      branch: branchName
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error.message
-    };
   }
-}
 
-function decodeBase64(value) {
-  return decodeURIComponent(
-    escape(
-      atob(
-        String(value).replace(/\n/g, "")
+  const urls =
+    [...map.values()]
+      .slice(0, 1000)
+      .map(
+        article =>
+          `<url>
+<loc>${esc(
+            SITE +
+            "/article/" +
+            encodeURIComponent(
+              article.id
+            )
+          )}</loc>
+<lastmod>${esc(
+            article.date
+          )}</lastmod>
+</url>`
       )
-    )
-  );
-}
+      .join("");
 
-function encodeBase64(value) {
-  return btoa(
-    unescape(
-      encodeURIComponent(value)
-    )
-  );
-}
-
-function extractCode(value) {
-  return String(value || "")
-    .replace(/^```(?:javascript|js)?/i, "")
-    .replace(/```$/g, "")
-    .trim();
-}
-
-async function github(
-  env,
-  path,
-  options = {}
-) {
-  const response = await fetch(
-    "https://api.github.com" + path,
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>${SITE}/</loc>
+</url>
+${urls}
+</urlset>`,
     {
-      ...options,
-      headers: {
-        Authorization:
-          `Bearer ${env.GITHUB_TOKEN}`,
-        Accept:
-          "application/vnd.github+json",
-        "X-GitHub-Api-Version":
-          "2022-11-28",
-        "User-Agent":
-          "NowPulse-AutoRepair",
-        ...(options.headers || {})
+      headers:{
+        "content-type":
+          "application/xml; charset=UTF-8",
+        "cache-control":
+          "public,max-age=300"
       }
     }
   );
+}
 
-  const text = await response.text();
-
-  let data;
-
+async function scheduled(
+  env
+) {
   try {
-    data = JSON.parse(text);
-  } catch {
-    data = {
-      raw: text
-    };
-  }
+    const items =
+      await loadFeed(
+        env,
+        true
+      );
 
-  if (!response.ok) {
-    throw new Error(
-      `GitHub ${response.status}: ${text.slice(
-        0,
-        500
-      )}`
+    await archiveFeed(
+      env,
+      items
+    );
+  } catch(error){
+    console.error(
+      "Scheduled ingestion failed",
+      error?.stack ||
+        error
     );
   }
-
-  return data;
 }
 
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
 
-    const lang =
-      url.searchParams.get("lang") === "en"
-        ? "en"
-        : "ar";
+  async fetch(
+    request,
+    env,
+    ctx
+  ){
 
-    try {
-      if (url.pathname === "/health") {
-        return json(
-          await diagnostics(env)
-        );
-      }
+    const url =
+      new URL(request.url);
 
-      if (url.pathname === "/robots.txt") {
+    try{
+
+      if(
+        url.pathname ===
+        "/robots.txt"
+      ){
+
         return new Response(
           `User-agent: *
 Allow: /
-Disallow: /api/
 Sitemap: ${SITE}/sitemap.xml`,
           {
-            headers: {
+            headers:{
               "content-type":
-                "text/plain; charset=utf-8"
+                "text/plain; charset=UTF-8"
             }
           }
         );
+
       }
 
-      if (url.pathname === "/sitemap.xml") {
-        return new Response(
-          await sitemap(env),
+      if(
+        url.pathname ===
+        "/sitemap.xml"
+      ){
+        return sitemap(env);
+      }
+
+      if(
+        url.pathname ===
+        "/health"
+      ){
+
+        return Response.json({
+          ok:true,
+          service:"NowPulse",
+          version:VERSION,
+          kv:Boolean(
+            env.NOWPULSE_KV
+          ),
+          ai:Boolean(
+            env.AI
+          ),
+          time:
+            new Date().toISOString()
+        });
+
+      }
+
+      if(
+        url.pathname ===
+        "/api/image"
+      ){
+        return imageEndpoint(
+          request,
+          env
+        );
+      }
+
+      if(
+        url.pathname ===
+        "/api/markets"
+      ){
+
+        return Response.json(
+          await markets(env),
           {
-            headers: {
-              "content-type":
-                "application/xml; charset=utf-8",
+            headers:{
               "cache-control":
-                "public,max-age=900"
+                "public,max-age=300"
             }
           }
         );
+
       }
 
-      if (url.pathname === "/rss.xml") {
-        const feed =
-          await getFeed(env);
+      if(
+        url.pathname ===
+        "/api/weather"
+      ){
 
-        return new Response(
-          `<?xml version="1.0"?>
-<rss version="2.0">
-<channel>
-<title>NowPulse</title>
-<link>${SITE}</link>
-<description>NowPulse news</description>
-${feed
-  .slice(0, 30)
-  .map(
-    article => `
-<item>
-<title>${esc(article.title)}</title>
-<link>${esc(
-      `${SITE}/article/${article.id}?lang=ar`
-    )}</link>
-<pubDate>${new Date(
-      article.time
-    ).toUTCString()}</pubDate>
-<description>${esc(
-      article.description
-    )}</description>
-</item>`
-  )
-  .join("")}
-</channel>
-</rss>`,
+        const city =
+          (
+            url.searchParams.get(
+              "city"
+            ) ||
+            "cairo"
+          ).toLowerCase();
+
+        return Response.json(
+          await weather(
+            env,
+            city
+          ),
           {
-            headers: {
-              "content-type":
-                "application/rss+xml; charset=utf-8"
+            headers:{
+              "cache-control":
+                "public,max-age=300"
             }
           }
         );
+
       }
 
-      if (url.pathname === "/api/news") {
-        return json(
-          (await getFeed(env)).slice(0, 40)
-        );
-      }
+      if(
+        url.pathname ===
+        "/search"
+      ){
 
-      if (url.pathname === "/api/search") {
-        return json(
+        const lang =
+          url.searchParams.get(
+            "lang"
+          ) === "en"
+            ? "en"
+            : "ar";
+
+        const query =
+          url.searchParams.get(
+            "q"
+          ) || "";
+
+        const results =
           await searchNews(
             env,
-            url.searchParams.get("q") || ""
-          )
-        );
-      }
-
-      if (url.pathname === "/api/image") {
-        return imageEndpoint(
-          env,
-          url.searchParams.get("id") || "",
-          request
-        );
-      }
-
-      if (url.pathname === "/api/weather") {
-        return json(
-          await weather(
-            url.searchParams.get("city") ||
-              "cairo"
-          )
-        );
-      }
-
-      if (url.pathname === "/api/markets") {
-        return json(
-          await markets()
-        );
-      }
-
-      if (
-        url.pathname ===
-        "/api/ai/diagnose"
-      ) {
-        return json(
-          await diagnostics(env)
-        );
-      }
-
-      if (
-        url.pathname ===
-          "/api/ai/repair" &&
-        request.method === "POST"
-      ) {
-        const body =
-          await request
-            .json()
-            .catch(() => ({}));
-
-        const result =
-          await autonomousRepair(
-            env,
-            ctx,
-            body.error ||
-              "manual repair request"
+            query
           );
 
-        return json(
-          result,
-          result.ok ? 200 : 503
+        const body = `
+<section class="hero">
+
+<div>
+<div class="eyebrow">
+🔎
+</div>
+
+<h1>
+${esc(
+  lang === "ar"
+    ? `نتائج البحث عن: ${query}`
+    : `Search results: ${query}`
+)}
+</h1>
+
+</div>
+
+</section>
+
+<div class="list">
+
+${
+  results
+    .map(
+      article =>
+        card(
+          article,
+          lang
+        )
+    )
+    .join("") ||
+  `<div class="empty">
+${
+  lang === "ar"
+    ? "لم نجد أخبارًا حديثة بهذا البحث."
+    : "No recent results found."
+}
+</div>`
+}
+
+</div>`;
+
+        return new Response(
+          layout({
+            lang,
+            title:
+              query ||
+              "Search",
+            body
+          }),
+          {
+            headers:{
+              "content-type":
+                "text/html; charset=UTF-8",
+              "cache-control":
+                "no-store"
+            }
+          }
         );
+
       }
 
-      if (
+      if(
         url.pathname.startsWith(
           "/article/"
         )
-      ) {
-        return articlePage(
-          env,
-          url.pathname.split("/")[2],
-          lang
-        );
-      }
+      ){
 
-      if (url.pathname === "/search") {
-        return searchPage(
-          env,
-          url.searchParams.get("q") || "",
-          lang
-        );
-      }
+        const lang =
+          url.searchParams.get(
+            "lang"
+          ) === "en"
+            ? "en"
+            : "ar";
 
-      if (
-        [
-          "about",
-          "privacy",
-          "terms",
-          "contact"
-        ].includes(
-          url.pathname.slice(1)
-        )
-      ) {
-        return staticPage(
-          lang,
-          url.pathname.slice(1)
-        );
-      }
+        const id =
+          decodeURIComponent(
+            url.pathname.slice(
+              "/article/"
+                .length
+            )
+          );
 
-      if (url.pathname === "/markets") {
-        return shell(
-          lang,
-          CATEGORIES.markets[lang],
-          "",
-          `
-<main class="page">
+        const article =
+          await findArticle(
+            env,
+            id
+          );
 
-<div class="page-title">
+        if(!article){
+
+          return new Response(
+            layout({
+              lang,
+              title:"Not found",
+              body:`
+<div class="empty">
+
 <h1>
-${CATEGORIES.markets[lang]}
+${
+  lang === "ar"
+    ? "الخبر غير متاح حاليًا."
+    : "Article unavailable."
+}
 </h1>
-</div>
 
-<div class="dashboard">
+</div>`
+            }),
+            {
+              status:404,
+              headers:{
+                "content-type":
+                  "text/html; charset=UTF-8"
+              }
+            }
+          );
 
-<div
-class="info-panel"
-id="market-full">
+        }
 
-Loading…
+        const related =
+          (
+            await loadFeed(
+              env
+            )
+          ).filter(
+            item =>
+              item.category ===
+                article.category &&
+              item.id !==
+                article.id
+          );
 
-</div>
+        const articleText =
+          await writeArticle(
+            env,
+            article,
+            related
+          );
 
-</div>
-
-</main>`
+        return new Response(
+          layout({
+            lang,
+            title:
+              article.title,
+            body:
+              articleBody(
+                article,
+                articleText,
+                lang
+              ),
+            active:
+              article.category
+          }),
+          {
+            headers:{
+              "content-type":
+                "text/html; charset=UTF-8",
+              "cache-control":
+                "public,max-age=60"
+            }
+          }
         );
+
       }
 
-      return home(
-        env,
-        lang,
+      const lang =
+        url.searchParams.get(
+          "lang"
+        ) === "en"
+          ? "en"
+          : "ar";
+
+      const category =
         url.searchParams.get(
           "category"
-        ) || "latest"
-      );
-    } catch (error) {
-      console.error(
-        "NowPulse error",
-        error
-      );
+        ) || "latest";
 
-      ctx.waitUntil(
-        autonomousRepair(
+      const items =
+        await loadFeed(env);
+
+      const enriched =
+        await enrichImages(
           env,
-          ctx,
-          error.stack ||
-            error.message ||
-            String(error)
-        ).catch(() => {})
+          items
+        );
+
+      const marketData =
+        await markets(env);
+
+      const weatherData =
+        await weather(
+          env,
+          "cairo"
+        );
+
+      const body =
+        homeBody(
+          enriched,
+          lang,
+          CATEGORIES[category]
+            ? category
+            : "latest",
+          marketData,
+          weatherData
+        );
+
+      return new Response(
+        layout({
+          lang,
+          title:
+            CATEGORIES[
+              category
+            ]?.[lang] ||
+            CATEGORIES.latest[
+              lang
+            ],
+          body,
+          active:category
+        }),
+        {
+          headers:{
+            "content-type":
+              "text/html; charset=UTF-8",
+            "cache-control":
+              "public,max-age=60,stale-while-revalidate=300"
+          }
+        }
       );
 
-      return html(
-        `
-<main
-style="
-font-family:system-ui;
-max-width:720px;
-margin:80px auto;
-padding:20px">
+    }catch(error){
 
-<h1>NowPulse</h1>
+      console.error(
+        "NowPulse request error",
+        {
+          path:
+            url.pathname,
+          error:
+            error?.stack ||
+            String(error)
+        }
+      );
+
+      const lang =
+        url.searchParams.get(
+          "lang"
+        ) === "en"
+          ? "en"
+          : "ar";
+
+      return new Response(
+        layout({
+          lang,
+          title:"NowPulse",
+          body:`
+<div class="empty">
+
+<h1>
+${
+  lang === "ar"
+    ? "حدث خطأ مؤقت"
+    : "Temporary error"
+}
+</h1>
 
 <p>
-حدث خطأ مؤقت وتم تسجيله لمحرك الصيانة.
+${
+  lang === "ar"
+    ? "سيحاول النظام معالجة المشكلة تلقائيًا. أعد تحميل الصفحة بعد لحظات."
+    : "The system will try to recover automatically. Reload in a moment."
+}
 </p>
 
-<a href="/">
-إعادة المحاولة
-</a>
-
-</main>`,
-        500
+</div>`
+        }),
+        {
+          status:503,
+          headers:{
+            "content-type":
+              "text/html; charset=UTF-8",
+            "cache-control":
+              "no-store",
+            "retry-after":"10"
+          }
+        }
       );
+
     }
   },
 
@@ -2922,14 +2733,12 @@ padding:20px">
     controller,
     env,
     ctx
-  ) {
+  ){
+
     ctx.waitUntil(
-      ingest(env).catch(error =>
-        console.error(
-          "cron ingest",
-          error
-        )
-      )
+      scheduled(env)
     );
+
   }
+
 };
