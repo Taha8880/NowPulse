@@ -48,6 +48,7 @@ export default {
             service: "NowPulse",
             kv,
             ai,
+            cron: "enabled",
             time: new Date().toISOString()
           },
           null,
@@ -66,5 +67,25 @@ export default {
         "content-type": "text/plain; charset=UTF-8"
       }
     });
+  },
+
+  async scheduled(event, env, ctx) {
+    try {
+      if (env.NOWPULSE_KV) {
+        await env.NOWPULSE_KV.put(
+          "nowpulse_cron_last_run",
+          JSON.stringify({
+            cron: event.cron,
+            scheduledTime: event.scheduledTime,
+            executedAt: new Date().toISOString()
+          }),
+          {
+            expirationTtl: 86400
+          }
+        );
+      }
+    } catch (error) {
+      // لا نسمح بخطأ KV بإسقاط Cron بالكامل
+    }
   }
 };
