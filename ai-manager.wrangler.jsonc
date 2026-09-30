@@ -1,16 +1,18 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
-
   "name": "nowpulse-ai-manager",
-
   "main": "ai-manager.js",
-
   "compatibility_date": "2026-09-30",
-
   "preview_urls": false,
 
   "ai": {
     "binding": "AI"
+  },
+
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
   },
 
   "observability": {
