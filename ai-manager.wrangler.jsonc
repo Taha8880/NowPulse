@@ -1,0 +1,29 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+
+  "name": "nowpulse-ai-manager",
+
+  "main": "ai-manager.js",
+
+  "compatibility_date": "2026-09-30",
+
+  "preview_urls": false,
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true
+    }
+  },
+
+  "vars": {
+    "NOWPULSE_AI_REPAIR_MODE": "safe",
+    "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
+    "NOWPULSE_GITHUB_BRANCH": "main",
+    "NOWPULSE_WORKER_FILE": "src/worker.js"
+  }
+}
