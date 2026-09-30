@@ -1,7 +1,9 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+
   "name": "nowpulse",
   "main": "src/worker.js",
+
   "compatibility_date": "2026-09-30",
   "preview_urls": false,
 
@@ -17,18 +19,27 @@
   ],
 
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": [
+      "*/5 * * * *"
+    ]
   },
 
   "observability": {
+    "enabled": true,
     "logs": {
       "enabled": true
     }
   },
 
+  "upload_source_maps": true,
+
   "vars": {
     "NOWPULSE_ENV": "production",
+    "NOWPULSE_VERSION": "5.0.0",
     "NOWPULSE_AI_REPAIR": "enabled",
-    "NOWPULSE_AI_REPAIR_MODE": "safe"
+    "NOWPULSE_AI_REPAIR_MODE": "safe",
+    "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
+    "NOWPULSE_GITHUB_BRANCH": "main",
+    "NOWPULSE_WORKER_FILE": "src/worker.js"
   }
 }
