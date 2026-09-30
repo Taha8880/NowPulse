@@ -3,6 +3,7 @@
   "name": "nowpulse",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-30",
+  "preview_urls": false,
 
   "ai": {
     "binding": "AI"
@@ -17,6 +18,12 @@
 
   "triggers": {
     "crons": ["*/5 * * * *"]
+  },
+
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
   },
 
   "vars": {
