@@ -1,0 +1,300 @@
+name: NowPulse Self Healing
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: nowpulse-self-healing
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Monitor NowPulse
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate Worker syntax
+        id: syntax
+        run: |
+          set -e
+
+          node --check src/worker.js
+
+          if [ -f ai-manager.js ]; then
+            node --check ai-manager.js
+          fi
+
+          echo "Syntax validation passed."
+
+      - name: Validate project architecture
+        id: architecture
+        run: |
+          set -e
+
+          test -f src/worker.js
+          test -f wrangler.jsonc
+          test -f ai-manager.js
+          test -f ai-manager.wrangler.jsonc
+
+          grep -q "export default" src/worker.js
+          grep -q "async fetch" src/worker.js
+          grep -q "scheduled" src/worker.js
+          grep -q "NOWPULSE_KV" src/worker.js
+          grep -q "env.AI" src/worker.js
+
+          if grep -Eq '\bwindow\.' src/worker.js; then
+            echo "ERROR: window API detected in Worker."
+            exit 1
+          fi
+
+          if grep -Eq '\bdocument\.' src/worker.js; then
+            echo "ERROR: document API detected in Worker."
+            exit 1
+          fi
+
+          if grep -Eq '\blocalStorage\.' src/worker.js; then
+            echo "ERROR: localStorage detected in Worker."
+            exit 1
+          fi
+
+          if grep -Eq 'BEGIN PRIVATE KEY' src/worker.js ai-manager.js; then
+            echo "ERROR: private key detected."
+            exit 1
+          fi
+
+          echo "Architecture validation passed."
+
+      - name: Install Wrangler
+        run: |
+          npm install --no-save wrangler@latest
+
+      - name: Deploy current production
+        if: steps.syntax.outcome == 'success' && steps.architecture.outcome == 'success'
+        run: |
+          npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Wait for deployment
+        run: |
+          sleep 10
+
+      - name: Check homepage
+        id: homepage
+        run: |
+          set +e
+
+          STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output /tmp/homepage.html \
+            --write-out "%{http_code}" \
+            --max-time 20 \
+            "https://nowpulse.tavengers16.workers.dev/")
+
+          echo "HTTP status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Homepage failed."
+            exit 1
+          fi
+
+          if ! grep -q "NowPulse" /tmp/homepage.html; then
+            echo "NowPulse marker missing."
+            exit 1
+          fi
+
+          echo "Homepage check passed."
+
+      - name: Check health endpoint
+        id: health
+        run: |
+          set +e
+
+          STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output /tmp/health.json \
+            --write-out "%{http_code}" \
+            --max-time 20 \
+            "https://nowpulse.tavengers16.workers.dev/health")
+
+          echo "Health HTTP status: $STATUS"
+
+          cat /tmp/health.json || true
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Health endpoint failed."
+            exit 1
+          fi
+
+          echo "Health check passed."
+
+      - name: Check sitemap
+        id: sitemap
+        run: |
+          set +e
+
+          STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output /tmp/sitemap.xml \
+            --write-out "%{http_code}" \
+            --max-time 20 \
+            "https://nowpulse.tavengers16.workers.dev/sitemap.xml")
+
+          echo "Sitemap HTTP status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Sitemap check failed."
+            exit 1
+          fi
+
+          if ! grep -q "<urlset" /tmp/sitemap.xml; then
+            echo "Invalid sitemap."
+            exit 1
+          fi
+
+          echo "Sitemap check passed."
+
+      - name: Check robots
+        id: robots
+        run: |
+          set +e
+
+          STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output /tmp/robots.txt \
+            --write-out "%{http_code}" \
+            --max-time 20 \
+            "https://nowpulse.tavengers16.workers.dev/robots.txt")
+
+          echo "Robots HTTP status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Robots check failed."
+            exit 1
+          fi
+
+          echo "Robots check passed."
+
+      - name: Check search
+        id: search
+        run: |
+          set +e
+
+          STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output /tmp/search.html \
+            --write-out "%{http_code}" \
+            --max-time 30 \
+            "https://nowpulse.tavengers16.workers.dev/search?q=Google&lang=en")
+
+          echo "Search HTTP status: $STATUS"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Search check failed."
+            exit 1
+          fi
+
+          if ! grep -q "NowPulse" /tmp/search.html; then
+            echo "Search page marker missing."
+            exit 1
+          fi
+
+          echo "Search check passed."
+
+      - name: Report healthy system
+        if: success()
+        run: |
+          echo "======================================"
+          echo "NOWPULSE HEALTH CHECK PASSED"
+          echo "======================================"
+          echo "Worker syntax: OK"
+          echo "Architecture: OK"
+          echo "Deployment: OK"
+          echo "Homepage: OK"
+          echo "Health endpoint: OK"
+          echo "Sitemap: OK"
+          echo "Robots: OK"
+          echo "Search: OK"
+          echo "======================================"
+
+  repair:
+    name: AI Repair
+    needs: monitor
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate AI Manager
+        run: |
+          node --check ai-manager.js
+
+      - name: Collect failure information
+        id: failure_info
+        run: |
+          {
+            echo "problem<<EOF"
+            echo "NOWPULSE AUTOMATED HEALTH CHECK FAILED."
+            echo
+            echo "The production Worker did not pass one or more checks."
+            echo
+            echo "Repository:"
+            echo "Taha8880/NowPulse"
+            echo
+            echo "Worker:"
+            echo "src/worker.js"
+            echo
+            echo "The AI repair manager must inspect the current source and determine the exact cause."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare AI repair
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "AI repair system is ready."
+
+          echo "The repair manager is intentionally not allowed to directly"
+          echo "replace production from inside this monitoring job."
+
+          echo "A repair request will be handled through the controlled"
+          echo "GitHub repair workflow."
