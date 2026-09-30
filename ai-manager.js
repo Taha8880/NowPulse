@@ -105,7 +105,9 @@ function text(value) {
 
 function truncate(value, max = 50000) {
   const s = text(value);
-  return s.length > max ? s.slice(0, max) + "\n/* truncated */" : s;
+  return s.length > max
+    ? s.slice(0, max) + "\n/* truncated */"
+    : s;
 }
 
 function githubHeaders(env) {
@@ -119,7 +121,8 @@ function githubHeaders(env) {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "User-Agent": "NowPulse-AI-Manager/7.0.0"
   };
 }
 
@@ -142,7 +145,9 @@ async function github(env, path, options = {}) {
   try {
     data = JSON.parse(body);
   } catch {
-    data = { raw: body };
+    data = {
+      raw: body
+    };
   }
 
   if (!response.ok) {
@@ -151,7 +156,36 @@ async function github(env, path, options = {}) {
       data?.error ||
       `GitHub API error ${response.status}`;
 
-    throw new Error(message);
+    const acceptedPermissions =
+      response.headers.get(
+        "X-Accepted-GitHub-Permissions"
+      ) || "";
+
+    const oauthScopes =
+      response.headers.get(
+        "X-OAuth-Scopes"
+      ) || "";
+
+    const documentation =
+      response.headers.get(
+        "documentation_url"
+      ) || "";
+
+    const details = [
+      `GitHub API ${response.status}`,
+      `message=${message}`,
+      acceptedPermissions
+        ? `accepted_permissions=${acceptedPermissions}`
+        : "",
+      oauthScopes
+        ? `oauth_scopes=${oauthScopes}`
+        : "",
+      documentation
+        ? `documentation=${documentation}`
+        : ""
+    ].filter(Boolean);
+
+    throw new Error(details.join(" | "));
   }
 
   return data;
@@ -182,7 +216,9 @@ async function getFile(env, path, branch = DEFAULT_BRANCH) {
   );
 
   if (!data || !data.content) {
-    throw new Error(`GitHub file content unavailable: ${path}`);
+    throw new Error(
+      `GitHub file content unavailable: ${path}`
+    );
   }
 
   const decoded = atob(
@@ -221,7 +257,11 @@ function maskCode(source) {
         continue;
       }
 
-      if (c === "'" || c === '"' || c === "`") {
+      if (
+        c === "'" ||
+        c === '"' ||
+        c === "`"
+      ) {
         quote = c;
         output += " ";
         state = "string";
@@ -249,7 +289,9 @@ function maskCode(source) {
         i++;
         state = "code";
       } else {
-        output += c === "\n" ? "\n" : " ";
+        output += c === "\n"
+          ? "\n"
+          : " ";
       }
 
       continue;
@@ -257,7 +299,9 @@ function maskCode(source) {
 
     if (state === "string") {
       if (escaped) {
-        output += c === "\n" ? "\n" : " ";
+        output += c === "\n"
+          ? "\n"
+          : " ";
         escaped = false;
         continue;
       }
@@ -274,7 +318,9 @@ function maskCode(source) {
         continue;
       }
 
-      output += c === "\n" ? "\n" : " ";
+      output += c === "\n"
+        ? "\n"
+        : " ";
     }
   }
 
@@ -317,6 +363,7 @@ function scanDelimiters(source) {
         line,
         column
       });
+
       continue;
     }
 
@@ -324,7 +371,8 @@ function scanDelimiters(source) {
       if (!stack.length) {
         return {
           ok: false,
-          message: `Unexpected closing ${c} at line ${line}, column ${column}.`
+          message:
+            `Unexpected closing ${c} at line ${line}, column ${column}.`
         };
       }
 
@@ -381,7 +429,9 @@ function detectWorkerBrowserApis(source) {
 }
 
 function hasClientTemplate(source) {
-  return /\b(?:const|let|var)\s+CLIENT\s*=\s*`/.test(source);
+  return /\b(?:const|let|var)\s+CLIENT\s*=\s*`/.test(
+    source
+  );
 }
 
 function detectForbiddenServerApis(source) {
@@ -392,8 +442,8 @@ function detectForbiddenServerApis(source) {
   const checks = [
     [/\bprocess\.env\b/, "process.env"],
     [/\brequire\s*\(/, "require()"],
-    [/\b__dirname\b/, "__dirname"],
-    [/\b__filename\b/, "__filename"],
+    [\b__dirname\b/, "__dirname"],
+    [\b__filename\b/, "__filename"],
     [/\bfs\./, "fs API"],
     [/\bchild_process\b/, "child_process"]
   ];
@@ -408,25 +458,32 @@ function detectForbiddenServerApis(source) {
 }
 
 function featureChecks(source) {
-  return REQUIRED_FEATURES.map(([name, pattern]) => ({
-    name,
-    present: pattern.test(source)
-  }));
+  return REQUIRED_FEATURES.map(
+    ([name, pattern]) => ({
+      name,
+      present: pattern.test(source)
+    })
+  );
 }
 
 function architectureInspection(source) {
   const problems = [];
   const warnings = [];
 
-  const delimiters = scanDelimiters(source);
+  const delimiters =
+    scanDelimiters(source);
 
   if (!delimiters.ok) {
     problems.push(delimiters.message);
   }
 
-  const browserApis = detectWorkerBrowserApis(source);
+  const browserApis =
+    detectWorkerBrowserApis(source);
 
-  if (browserApis.length && !hasClientTemplate(source)) {
+  if (
+    browserApis.length &&
+    !hasClientTemplate(source)
+  ) {
     problems.push(
       `Browser APIs detected outside a CLIENT template: ${browserApis.join(", ")}`
     );
@@ -438,7 +495,8 @@ function architectureInspection(source) {
     );
   }
 
-  const forbidden = detectForbiddenServerApis(source);
+  const forbidden =
+    detectForbiddenServerApis(source);
 
   if (forbidden.length) {
     problems.push(
@@ -446,11 +504,14 @@ function architectureInspection(source) {
     );
   }
 
-  const features = featureChecks(source);
+  const features =
+    featureChecks(source);
 
   for (const item of features) {
     if (!item.present) {
-      problems.push(`Required feature missing: ${item.name}`);
+      problems.push(
+        `Required feature missing: ${item.name}`
+      );
     }
   }
 
@@ -464,61 +525,97 @@ function architectureInspection(source) {
 }
 
 async function inspectProject(env) {
-  const repository = await getRepository(env);
-  const branch = await getBranch(env, DEFAULT_BRANCH);
-  const tree = await getTree(env, DEFAULT_BRANCH);
+  const repository =
+    await getRepository(env);
 
-  const worker = await getFile(
-    env,
-    WORKER_FILE,
-    DEFAULT_BRANCH
-  );
+  const branch =
+    await getBranch(
+      env,
+      DEFAULT_BRANCH
+    );
 
-  const manager = await getFile(
-    env,
-    "ai-manager.js",
-    DEFAULT_BRANCH
-  );
+  const tree =
+    await getTree(
+      env,
+      DEFAULT_BRANCH
+    );
 
-  const config = await getFile(
-    env,
-    "wrangler.jsonc",
-    DEFAULT_BRANCH
-  );
+  const worker =
+    await getFile(
+      env,
+      WORKER_FILE,
+      DEFAULT_BRANCH
+    );
+
+  const manager =
+    await getFile(
+      env,
+      "ai-manager.js",
+      DEFAULT_BRANCH
+    );
+
+  const config =
+    await getFile(
+      env,
+      "wrangler.jsonc",
+      DEFAULT_BRANCH
+    );
 
   const workerArchitecture =
-    architectureInspection(worker.content);
+    architectureInspection(
+      worker.content
+    );
 
   const managerDelimiter =
-    scanDelimiters(manager.content);
+    scanDelimiters(
+      manager.content
+    );
 
   const managerProblems = [];
 
   if (!managerDelimiter.ok) {
-    managerProblems.push(managerDelimiter.message);
+    managerProblems.push(
+      managerDelimiter.message
+    );
   }
 
   const configProblems = [];
 
-  if (!/"name"\s*:\s*"nowpulse"/.test(config.content)) {
+  if (
+    !/"name"\s*:\s*"nowpulse"/.test(
+      config.content
+    )
+  ) {
     configProblems.push(
       "wrangler.jsonc does not appear to target the nowpulse Worker."
     );
   }
 
-  if (!/"main"\s*:\s*"src\/worker\.js"/.test(config.content)) {
+  if (
+    !/"main"\s*:\s*"src\/worker\.js"/.test(
+      config.content
+    )
+  ) {
     configProblems.push(
       "wrangler.jsonc main should be src/worker.js."
     );
   }
 
-  if (!/"binding"\s*:\s*"AI"/.test(config.content)) {
+  if (
+    !/"binding"\s*:\s*"AI"/.test(
+      config.content
+    )
+  ) {
     configProblems.push(
       "Workers AI binding AI was not found."
     );
   }
 
-  if (!/"binding"\s*:\s*"NOWPULSE_KV"/.test(config.content)) {
+  if (
+    !/"binding"\s*:\s*"NOWPULSE_KV"/.test(
+      config.content
+    )
+  ) {
     configProblems.push(
       "KV binding NOWPULSE_KV was not found."
     );
@@ -534,12 +631,15 @@ async function inspectProject(env) {
   ];
 
   const treePaths = new Set(
-    (tree.tree || []).map(item => item.path)
+    (tree.tree || []).map(
+      item => item.path
+    )
   );
 
-  const missingFiles = requiredFiles.filter(
-    file => !treePaths.has(file)
-  );
+  const missingFiles =
+    requiredFiles.filter(
+      file => !treePaths.has(file)
+    );
 
   const deploymentProblems = [];
 
@@ -550,14 +650,19 @@ async function inspectProject(env) {
   }
 
   const files = (tree.tree || [])
-    .filter(item => item.type === "blob")
-    .map(item => item.path)
-    .filter(path =>
-      path.startsWith(".github/") ||
-      path.startsWith("src/") ||
-      path === "ai-manager.js" ||
-      path === "ai-manager.wrangler.jsonc" ||
-      path === "wrangler.jsonc"
+    .filter(
+      item => item.type === "blob"
+    )
+    .map(
+      item => item.path
+    )
+    .filter(
+      path =>
+        path.startsWith(".github/") ||
+        path.startsWith("src/") ||
+        path === "ai-manager.js" ||
+        path === "ai-manager.wrangler.jsonc" ||
+        path === "wrangler.jsonc"
     );
 
   return {
@@ -567,26 +672,40 @@ async function inspectProject(env) {
       configProblems.length === 0 &&
       deploymentProblems.length === 0,
 
-    repository: repository.full_name,
-    branch: branch.name,
-    repositoryPrivate: repository.private,
-    defaultBranch: repository.default_branch,
+    repository:
+      repository.full_name,
 
-    architecture: workerArchitecture,
+    branch:
+      branch.name,
+
+    repositoryPrivate:
+      repository.private,
+
+    defaultBranch:
+      repository.default_branch,
+
+    architecture:
+      workerArchitecture,
 
     manager: {
-      ok: managerProblems.length === 0,
-      problems: managerProblems
+      ok:
+        managerProblems.length === 0,
+      problems:
+        managerProblems
     },
 
     configuration: {
-      ok: configProblems.length === 0,
-      problems: configProblems
+      ok:
+        configProblems.length === 0,
+      problems:
+        configProblems
     },
 
     deployment: {
-      ok: deploymentProblems.length === 0,
-      problems: deploymentProblems
+      ok:
+        deploymentProblems.length === 0,
+      problems:
+        deploymentProblems
     },
 
     files
@@ -612,25 +731,37 @@ function protectedFeatures(source) {
   const result = {};
 
   for (const name of checks) {
-    result[name] = new RegExp(
-      name === "Created by Taha"
-        ? "Created\\s+by\\s+Taha"
-        : name,
-      "i"
-    ).test(source);
+    result[name] =
+      new RegExp(
+        name === "Created by Taha"
+          ? "Created\\s+by\\s+Taha"
+          : name,
+        "i"
+      ).test(source);
   }
 
   return result;
 }
 
-function compareProtectedFeatures(before, after) {
-  const oldFeatures = protectedFeatures(before);
-  const newFeatures = protectedFeatures(after);
+function compareProtectedFeatures(
+  before,
+  after
+) {
+  const oldFeatures =
+    protectedFeatures(before);
+
+  const newFeatures =
+    protectedFeatures(after);
 
   const removed = [];
 
-  for (const key of Object.keys(oldFeatures)) {
-    if (oldFeatures[key] && !newFeatures[key]) {
+  for (
+    const key of Object.keys(oldFeatures)
+  ) {
+    if (
+      oldFeatures[key] &&
+      !newFeatures[key]
+    ) {
       removed.push(key);
     }
   }
@@ -639,33 +770,63 @@ function compareProtectedFeatures(before, after) {
 }
 
 function cleanAIJson(value) {
-  let s = text(value).trim();
+  let s =
+    text(value).trim();
 
-  if (s.startsWith("```")) {
-    s = s.replace(/^```(?:json)?/i, "");
-    s = s.replace(/```$/i, "");
+  if (
+    s.startsWith("```")
+  ) {
+    s = s.replace(
+      /^```(?:json)?/i,
+      ""
+    );
+
+    s = s.replace(
+      /```$/i,
+      ""
+    );
   }
 
-  const first = s.indexOf("{");
-  const last = s.lastIndexOf("}");
+  const first =
+    s.indexOf("{");
 
-  if (first >= 0 && last > first) {
-    s = s.slice(first, last + 1);
+  const last =
+    s.lastIndexOf("}");
+
+  if (
+    first >= 0 &&
+    last > first
+  ) {
+    s =
+      s.slice(
+        first,
+        last + 1
+      );
   }
 
   return s.trim();
 }
 
-async function askAI(env, inspection, workerSource) {
+async function askAI(
+  env,
+  inspection,
+  workerSource
+) {
   if (!env.AI) {
-    throw new Error("Workers AI binding AI is missing.");
+    throw new Error(
+      "Workers AI binding AI is missing."
+    );
   }
 
   const prompt = `
 ${PROJECT_RULES}
 
 Current inspection:
-${JSON.stringify(inspection, null, 2)}
+${JSON.stringify(
+  inspection,
+  null,
+  2
+)}
 
 You must decide whether a repair is actually necessary.
 
@@ -707,27 +868,31 @@ Rules:
 - The Worker must remain Cloudflare Worker compatible.
 
 Current worker source:
-${truncate(workerSource, 70000)}
+${truncate(
+  workerSource,
+  70000
+)}
 `;
 
-  const result = await env.AI.run(
-    AI_MODEL,
-    {
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a conservative production JavaScript repair engineer."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 12000
-    }
-  );
+  const result =
+    await env.AI.run(
+      AI_MODEL,
+      {
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a conservative production JavaScript repair engineer."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 12000
+      }
+    );
 
   const raw =
     result?.response ||
@@ -736,11 +901,15 @@ ${truncate(workerSource, 70000)}
     "";
 
   if (!raw) {
-    throw new Error("Workers AI returned an empty response.");
+    throw new Error(
+      "Workers AI returned an empty response."
+    );
   }
 
   try {
-    return JSON.parse(cleanAIJson(raw));
+    return JSON.parse(
+      cleanAIJson(raw)
+    );
   } catch {
     throw new Error(
       "Workers AI returned invalid JSON."
@@ -748,21 +917,46 @@ ${truncate(workerSource, 70000)}
   }
 }
 
-function validateRepairPlan(plan, beforeWorker) {
-  if (!plan || typeof plan !== "object") {
-    throw new Error("Invalid AI repair plan.");
+function validateRepairPlan(
+  plan,
+  beforeWorker
+) {
+  if (
+    !plan ||
+    typeof plan !== "object"
+  ) {
+    throw new Error(
+      "Invalid AI repair plan."
+    );
   }
 
-  if (!Array.isArray(plan.changes)) {
-    throw new Error("AI repair plan has no changes array.");
+  if (
+    !Array.isArray(
+      plan.changes
+    )
+  ) {
+    throw new Error(
+      "AI repair plan has no changes array."
+    );
   }
 
-  for (const change of plan.changes) {
-    if (!change || typeof change !== "object") {
-      throw new Error("Invalid repair change.");
+  for (
+    const change of plan.changes
+  ) {
+    if (
+      !change ||
+      typeof change !== "object"
+    ) {
+      throw new Error(
+        "Invalid repair change."
+      );
     }
 
-    if (!ALLOWED_REPAIR_FILES.has(change.path)) {
+    if (
+      !ALLOWED_REPAIR_FILES.has(
+        change.path
+      )
+    ) {
       throw new Error(
         `Repair attempted to modify forbidden file: ${change.path}`
       );
@@ -778,8 +972,12 @@ function validateRepairPlan(plan, beforeWorker) {
     }
 
     if (
-      change.content.includes("GITHUB_TOKEN") &&
-      /GITHUB_TOKEN\s*[:=]\s*["'`][^"'`]+/.test(change.content)
+      change.content.includes(
+        "GITHUB_TOKEN"
+      ) &&
+      /GITHUB_TOKEN\s*[:=]\s*["'`][^"'`]+/.test(
+        change.content
+      )
     ) {
       throw new Error(
         `Possible hard-coded secret in ${change.path}.`
@@ -787,15 +985,18 @@ function validateRepairPlan(plan, beforeWorker) {
     }
   }
 
-  const workerChange = plan.changes.find(
-    item => item.path === WORKER_FILE
-  );
+  const workerChange =
+    plan.changes.find(
+      item =>
+        item.path === WORKER_FILE
+    );
 
   if (workerChange) {
-    const removed = compareProtectedFeatures(
-      beforeWorker,
-      workerChange.content
-    );
+    const removed =
+      compareProtectedFeatures(
+        beforeWorker,
+        workerChange.content
+      );
 
     if (removed.length) {
       throw new Error(
@@ -804,7 +1005,9 @@ function validateRepairPlan(plan, beforeWorker) {
     }
 
     const architecture =
-      architectureInspection(workerChange.content);
+      architectureInspection(
+        workerChange.content
+      );
 
     if (!architecture.ok) {
       throw new Error(
@@ -816,11 +1019,15 @@ function validateRepairPlan(plan, beforeWorker) {
   return true;
 }
 
-async function createBranch(env, branchName) {
-  const main = await getBranch(
-    env,
-    DEFAULT_BRANCH
-  );
+async function createBranch(
+  env,
+  branchName
+) {
+  const main =
+    await getBranch(
+      env,
+      DEFAULT_BRANCH
+    );
 
   return github(
     env,
@@ -828,11 +1035,45 @@ async function createBranch(env, branchName) {
     {
       method: "POST",
       body: JSON.stringify({
-        ref: `refs/heads/${branchName}`,
-        sha: main.commit.sha
+        ref:
+          `refs/heads/${branchName}`,
+        sha:
+          main.commit.sha
       })
     }
   );
+}
+
+function base64EncodeUtf8(value) {
+  const bytes =
+    new TextEncoder().encode(
+      value
+    );
+
+  let binary = "";
+
+  const chunkSize = 0x8000;
+
+  for (
+    let i = 0;
+    i < bytes.length;
+    i += chunkSize
+  ) {
+    const chunk =
+      bytes.subarray(
+        i,
+        Math.min(
+          i + chunkSize,
+          bytes.length
+        )
+      );
+
+    binary += String.fromCharCode(
+      ...chunk
+    );
+  }
+
+  return btoa(binary);
 }
 
 async function updateFile(
@@ -845,23 +1086,28 @@ async function updateFile(
   let existing = null;
 
   try {
-    existing = await getFile(
-      env,
-      path,
-      branch
-    );
+    existing =
+      await getFile(
+        env,
+        path,
+        branch
+      );
   } catch {
     existing = null;
   }
 
   const body = {
     message,
-    content: btoa(unescape(encodeURIComponent(content))),
+    content:
+      base64EncodeUtf8(
+        content
+      ),
     branch
   };
 
   if (existing?.sha) {
-    body.sha = existing.sha;
+    body.sha =
+      existing.sha;
   }
 
   return github(
@@ -869,7 +1115,8 @@ async function updateFile(
     `/contents/${path}`,
     {
       method: "PUT",
-      body: JSON.stringify(body)
+      body:
+        JSON.stringify(body)
     }
   );
 }
@@ -885,12 +1132,13 @@ async function createPullRequest(
     "/pulls",
     {
       method: "POST",
-      body: JSON.stringify({
-        title,
-        head: branch,
-        base: DEFAULT_BRANCH,
-        body
-      })
+      body:
+        JSON.stringify({
+          title,
+          head: branch,
+          base: DEFAULT_BRANCH,
+          body
+        })
     }
   );
 }
@@ -903,7 +1151,8 @@ async function prepareRepair(env) {
     return {
       ok: true,
       repairRequired: false,
-      message: "Project is healthy; no repair required.",
+      message:
+        "Project is healthy; no repair required.",
       inspection
     };
   }
@@ -922,13 +1171,18 @@ async function prepareRepair(env) {
       worker.content
     );
 
-  if (!plan.repairRequired) {
+  if (
+    !plan.repairRequired
+  ) {
     return {
       ok: true,
       repairRequired: false,
-      message: "AI determined that no safe repair is required.",
-      diagnosis: plan.diagnosis || "",
-      validation: plan.validation || [],
+      message:
+        "AI determined that no safe repair is required.",
+      diagnosis:
+        plan.diagnosis || "",
+      validation:
+        plan.validation || [],
       inspection
     };
   }
@@ -946,7 +1200,9 @@ async function prepareRepair(env) {
     branchName
   );
 
-  for (const change of plan.changes) {
+  for (
+    const change of plan.changes
+  ) {
     await updateFile(
       env,
       change.path,
@@ -980,13 +1236,19 @@ async function prepareRepair(env) {
     repairRequired: true,
     branch: branchName,
     pullRequest: {
-      number: pullRequest.number,
-      url: pullRequest.html_url,
-      state: pullRequest.state
+      number:
+        pullRequest.number,
+      url:
+        pullRequest.html_url,
+      state:
+        pullRequest.state
     },
-    diagnosis: plan.diagnosis || "",
-    validation: plan.validation || [],
-    notes: plan.notes || [],
+    diagnosis:
+      plan.diagnosis || "",
+    validation:
+      plan.validation || [],
+    notes:
+      plan.notes || [],
     inspection
   };
 }
@@ -994,28 +1256,49 @@ async function prepareRepair(env) {
 function health(env) {
   return {
     ok: true,
-    service: "NowPulse AI Manager",
-    version: VERSION,
-    mode: env.NOWPULSE_AI_REPAIR_MODE || "safe",
-    ai: Boolean(env.AI),
-    github: Boolean(env.GITHUB_TOKEN),
-    repository: env.NOWPULSE_GITHUB_REPO || REPOSITORY,
-    branch: env.NOWPULSE_GITHUB_BRANCH || DEFAULT_BRANCH,
-    workerFile: env.NOWPULSE_WORKER_FILE || WORKER_FILE,
-    timestamp: new Date().toISOString()
+    service:
+      "NowPulse AI Manager",
+    version:
+      VERSION,
+    mode:
+      env.NOWPULSE_AI_REPAIR_MODE ||
+      "safe",
+    ai:
+      Boolean(env.AI),
+    github:
+      Boolean(env.GITHUB_TOKEN),
+    repository:
+      env.NOWPULSE_GITHUB_REPO ||
+      REPOSITORY,
+    branch:
+      env.NOWPULSE_GITHUB_BRANCH ||
+      DEFAULT_BRANCH,
+    workerFile:
+      env.NOWPULSE_WORKER_FILE ||
+      WORKER_FILE,
+    timestamp:
+      new Date().toISOString()
   };
 }
 
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+  async fetch(
+    request,
+    env
+  ) {
+    const url =
+      new URL(request.url);
 
     try {
-      if (url.pathname === "/") {
+      if (
+        url.pathname === "/"
+      ) {
         return json({
           ok: true,
-          service: "NowPulse AI Manager",
-          version: VERSION,
+          service:
+            "NowPulse AI Manager",
+          version:
+            VERSION,
           endpoints: [
             "/health",
             "/inspect",
@@ -1024,21 +1307,33 @@ export default {
         });
       }
 
-      if (url.pathname === "/health") {
-        return json(health(env));
-      }
-
-      if (url.pathname === "/inspect") {
-        const result =
-          await inspectProject(env);
-
+      if (
+        url.pathname === "/health"
+      ) {
         return json(
-          result,
-          result.ok ? 200 : 409
+          health(env)
         );
       }
 
-      if (url.pathname === "/repair") {
+      if (
+        url.pathname === "/inspect"
+      ) {
+        const result =
+          await inspectProject(
+            env
+          );
+
+        return json(
+          result,
+          result.ok
+            ? 200
+            : 409
+        );
+      }
+
+      if (
+        url.pathname === "/repair"
+      ) {
         if (
           request.method !== "POST" &&
           request.method !== "GET"
@@ -1046,22 +1341,28 @@ export default {
           return json(
             {
               ok: false,
-              error: "Use POST or GET."
+              error:
+                "Use POST or GET."
             },
             405
           );
         }
 
         const result =
-          await prepareRepair(env);
+          await prepareRepair(
+            env
+          );
 
-        return json(result);
+        return json(
+          result
+        );
       }
 
       return json(
         {
           ok: false,
-          error: "Not found."
+          error:
+            "Not found."
         },
         404
       );
@@ -1072,18 +1373,26 @@ export default {
           error:
             error?.message ||
             String(error),
-          service: "NowPulse AI Manager",
-          version: VERSION
+          service:
+            "NowPulse AI Manager",
+          version:
+            VERSION
         },
         500
       );
     }
   },
 
-  async scheduled(event, env, ctx) {
+  async scheduled(
+    event,
+    env,
+    ctx
+  ) {
     if (
-      (env.NOWPULSE_AI_REPAIR_MODE || "safe") !==
-      "safe"
+      (
+        env.NOWPULSE_AI_REPAIR_MODE ||
+        "safe"
+      ) !== "safe"
     ) {
       return;
     }
@@ -1092,10 +1401,14 @@ export default {
       (async () => {
         try {
           const inspection =
-            await inspectProject(env);
+            await inspectProject(
+              env
+            );
 
           if (!inspection.ok) {
-            await prepareRepair(env);
+            await prepareRepair(
+              env
+            );
           }
         } catch {
           // Scheduled self-healing must never
