@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          payload='{"params":"{\"trigger\":\"github-actions\",\"scheduledAt\":\"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'\}"}'
+          payload="$(node -e 'console.log(JSON.stringify({params:JSON.stringify({trigger:"github-actions",scheduledAt:new Date().toISOString()})}))')"
           response="$(curl -fsSL --max-time 30 \
             -X POST \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
