@@ -146,6 +146,24 @@ function queryFor(cat,lang){
  return q[cat]||q.latest ? (q[cat]||q.latest)+base : q.latest+base;
 }
 
+async function fallbackRss(lang,cat){
+ const ar=lang==="ar";
+ const feeds=ar?[
+  ["BBC Arabic","https://feeds.bbci.co.uk/arabic/rss.xml"],
+  ["Al Jazeera Arabic","https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"]
+ ]:[
+  ["BBC World","https://feeds.bbci.co.uk/news/world/rss.xml"],
+  ["BBC Middle East","https://feeds.bbci.co.uk/news/world/middle_east/rss.xml"],
+  ["BBC Business","https://feeds.bbci.co.uk/news/business/rss.xml"],
+  ["BBC Technology","https://feeds.bbci.co.uk/news/technology/rss.xml"]
+ ];
+ const out=[];
+ for(const [name,url] of feeds){
+  try{out.push(...parseRss(await fetchText(url),name))}catch{}
+ }
+ return out;
+}
+
 async function gdeltFeed(q,lang){
  try{
   const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=20&format=rss&timespan=1d&sort=HybridRel";
@@ -171,8 +189,10 @@ async function feed(env,lang,cat="latest"){
   try{all.push(...parseRss(await fetchText(url),region))}catch{}
  }
  if(!all.length){
-  const fallback=await gdeltFeed(q,lang);
-  all.push(...fallback);
+  all.push(...await fallbackRss(lang,cat));
+ }
+ if(!all.length){
+  all.push(...await gdeltFeed(q,lang));
  }
  const data=dedupe(all).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,36);
  if(data.length)await cacheWrite(env,key,data,TTL.news);
