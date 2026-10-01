@@ -365,9 +365,9 @@ function sectionHtml(key,items,lang){
 }
 
 async function home(env,lang){
- const data=await news(env,lang,"latest");
+ const data={latest:[],egypt:[],arab:[],world:[],politics:[],sports:[],economy:[],tech:[],arts:[],health:[],travel:[],trends:[]};
  const m={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null};
- const w=await weather(env,"cairo");
+ const w={cityAr:"القاهرة",cityEn:"Cairo",temperature:null,humidity:null};
  const ar=lang==="ar";
  const value=v=>typeof v==="number"&&v>0?v.toFixed(2):"—";
  const body="<section class='hero'><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع فصل واضح بين الخبر والمعلومة.":"Egypt and Arab news first, followed by global coverage, with clear separation between news and knowledge.")+"</p><div class='quote'>"+esc(quote(lang))+"</div></section><div class='markets' aria-label='Markets'><div class='market'><b>USD / EGP</b><strong id='mk-usd'>"+value(m.usdEgp)+"</strong><em>"+(ar?"دولار":"USD")+"</em></div><div class='market'><b>EUR / EGP</b><strong id='mk-eur'>"+value(m.eurEgp)+"</strong><em>"+(ar?"يورو":"EUR")+"</em></div><div class='market'><b>GBP / EGP</b><strong id='mk-gbp'>"+value(m.gbpEgp)+"</strong><em>"+(ar?"جنيه إسترليني":"GBP")+"</em></div><div class='market'><b>CHF / EGP</b><strong id='mk-chf'>"+value(m.chfEgp)+"</strong><em>"+(ar?"فرنك":"CHF")+"</em></div><div class='market'><b>Gold 24K</b><strong id='mk-g24'>"+value(m.gold24)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 21K</b><strong id='mk-g21'>"+value(m.gold21)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 18K</b><strong id='mk-g18'>"+value(m.gold18)+"</strong><em>EGP / g</em></div></div><div class='weather'>☁ <span>"+(ar?w.cityAr:w.cityEn)+" · "+(typeof w.temperature==="number"?w.temperature.toFixed(1):"—")+"°C · "+(typeof w.humidity==="number"?w.humidity.toFixed(0):"—")+"%</span></div>"+sectionHtml("egypt",data.egypt,lang)+sectionHtml("arab",data.arab,lang)+sectionHtml("world",data.world,lang)+sectionHtml("politics",data.politics,lang)+sectionHtml("sports",data.sports,lang)+sectionHtml("economy",data.economy,lang)+sectionHtml("tech",data.tech,lang);
