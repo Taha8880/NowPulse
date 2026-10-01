@@ -25,7 +25,7 @@ async function createPR(env,p,baseSha){const b="ai-repair/guardian-"+Date.now();
 async function waitMerge(env,n){for(let i=0;i<12;i++){const pr=await gh(env,"/pulls/"+n);if(pr.merged)return {merged:true,sha:pr.merge_commit_sha};if(pr.state==="closed")return {merged:false,closed:true};await new Promise(r=>setTimeout(r,30000));}return {merged:false,timeout:true};}
 export class NowPulseMaintenanceWorkflow extends WorkflowEntrypoint {
 async run(event,step){const guardian=await getAgentByName(this.env.NowPulseGuardian,"primary");const lock=await step.do("acquire-maintenance-lock",()=>guardian.beginRun("scheduled-"+Date.now(),1200));if(!lock.acquired)return {status:"skipped",reason:"maintenance-lock-active"};try{
-const audit=await step.do("audit-production",prod);await step.mergeAgentState({status:"auditing",lastResult:audit});
+const audit=await step.do("audit-production",prod);await step.do("record-audit-state",()=>guardian.updateStatus({status:"auditing",lastResult:audit}));
 if(audit.issues.length===0){const result={status:"clean",audit};await step.do("record-clean",()=>guardian.finishRun({status:"clean",result}));return result;}
 const base=await step.do("read-main-head",()=>gh(this.env,"/git/ref/heads/"+BRANCH));
 const paths=["src/worker.js","ai-manager.js","wrangler.jsonc","package.json",".github/workflows/validate-pr.yml","AGENTS.md"];const files=await step.do("inspect-root-files",async()=>Promise.all(paths.map(p=>file(this.env,p,BRANCH))));
