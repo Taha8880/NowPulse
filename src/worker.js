@@ -95,7 +95,8 @@ function xmlAttr(block,tag,attr){
  const m=block.match(re);
  return m?m[1]:"";
 }
-function mediaUrl(v){return String(v||"").startsWith("//")?"https:"+String(v):String(v||"")}\nfunction goodImage(v){
+function mediaUrl(v){return String(v||"").startsWith("//")?"https:"+String(v):String(v||"")}
+function goodImage(v){
  const u=safeUrl(v);
  if(!u)return "";
  const x=u.toLowerCase();
