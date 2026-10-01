@@ -65,5 +65,13 @@
         "error_retention": "7 days"
       }
     }
-  }
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "NowPulseGuardian"
+      ]
+    }
+  ]
 }
