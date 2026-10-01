@@ -108,7 +108,7 @@ async function fetchHtmlNews(url,category){try{
   const r=await timeoutFetch(url,{headers:{"accept":"text/html,application/xhtml+xml","user-agent":"Mozilla/5.0 NowPulse/6.1"}},7000);
   if(!r.ok)return[];
   const html=await r.text(),out=[],seen=new Set(),base=new URL(url).origin;
-  const re=/<a\\b[^>]*href=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi;
+  const re=/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   for(const m of html.matchAll(re)){
     const href=resolveUrl(m[1],url),title=cleanText(m[2]);
     if(!href||!title||title.length<18||title.length>240||seen.has(href))continue;
