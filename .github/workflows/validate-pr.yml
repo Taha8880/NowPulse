@@ -1,0 +1,56 @@
+name: NowPulse PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate JavaScript syntax
+        run: |
+          node --check src/worker.js
+          node --check ai-manager.js
+
+      - name: Validate required files
+        run: |
+          test -f src/worker.js
+          test -f wrangler.jsonc
+          test -f ai-manager.js
+          test -f ai-manager.wrangler.jsonc
+
+      - name: Validate required architecture
+        run: |
+          grep -q 'export default' src/worker.js
+          grep -q 'async fetch' src/worker.js
+          grep -q 'scheduled' src/worker.js
+          grep -q 'NOWPULSE_KV' src/worker.js
+          grep -q 'Created by Taha' src/worker.js
+          grep -q 'binding' wrangler.jsonc
+          grep -q 'binding' ai-manager.wrangler.jsonc
+
+      - name: Validate ads.txt implementation
+        run: |
+          grep -q 'ads.txt' src/worker.js
+          grep -q 'google.com' src/worker.js
+
+      - name: Validate AI repair mode
+        run: |
+          grep -q 'NOWPULSE_AI_REPAIR_MODE' ai-manager.wrangler.jsonc
+
+      - name: Validation complete
+        run: echo 'NowPulse PR validation passed.'
