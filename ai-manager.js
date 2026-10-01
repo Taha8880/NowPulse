@@ -4,6 +4,7 @@ const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
 const WORKER_FILE = "src/worker.js";
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const PRODUCTION_URL = "https://nowpulse.tavengers16.workers.dev";
 
 const ALLOWED_REPAIR_FILES = new Set([
   "src/worker.js",
@@ -1116,6 +1117,8 @@ function cleanAIJson(value) {
 
   return result.trim();
 }
+
+async function runtimeInspection(){const paths=["/health","/","/?lang=ar","/?lang=en","/search?q=Egypt&lang=en","/search?q=مصر&lang=ar","/api/markets","/sitemap.xml","/ads.txt"];const checks=[];for(const path of paths){try{const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"});const body=await r.text();checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/article|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories/i.test(body),size:body.length});}catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}}const home=checks.find(x=>x.path==="/?lang=ar");return{ok:checks.every(x=>x.ok),production:PRODUCTION_URL,checks,newsProblem:Boolean(home?.hasNoNews||home?.size<3000)};}
 
 async function askAI(
   env,
