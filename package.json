@@ -1,0 +1,15 @@
+{
+  "name": "nowpulse",
+  "private": true,
+  "version": "5.2.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "scripts": {
+    "check": "node --check src/worker.js && node --check ai-manager.js",
+    "deploy": "wrangler deploy"
+  }
+}
