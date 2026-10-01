@@ -130,7 +130,7 @@ jobs:
           for attempt in $(seq 1 24); do
             if health="$(curl -fsSL --max-time 20 "$base/health" 2>/dev/null)"; then
               echo "$health"
-              if echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q '"service":"NowPulse"' && echo "$health" | grep -q '"version":"6.1.1"'; then
+              if echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q '"service":"NowPulse"' && echo "$health" | grep -q '"version":"6.1.3"'; then
                 ok=1
                 break
               fi
