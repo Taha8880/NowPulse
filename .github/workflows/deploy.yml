@@ -59,8 +59,8 @@ jobs:
             ["Guardian export", w, "NowPulseGuardian"],
             ["Workflow export", w, "NowPulseMaintenanceWorkflow"],
             ["Workflow type", w, '"type": "workflow"'],
-            ["Workflow schedules", w, '"schedules"'],
-            ["15-minute schedule", w, "*/15 * * * *"],
+            ["Worker cron trigger", fs.readFileSync("src/worker.js", "utf8"), "ai:maintenance:trigger:"],
+            ["15-minute trigger window", fs.readFileSync("src/worker.js", "utf8"), "900000"],
             ["GitHub secret access", wf, "NOWPULSE_GITHUB_TOKEN"],
             ["Guardian agent access", wf, "getAgentByName"]
           ]) {
@@ -91,25 +91,24 @@ jobs:
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          payload='{"class_name":"NowPulseMaintenanceWorkflow","script_name":"nowpulse","schedules":[{"cron":"*/15 * * * *"}]}'
+          payload='{"class_name":"NowPulseMaintenanceWorkflow","script_name":"nowpulse"}'
           response="$(curl -fsSL --max-time 30             -X PUT             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data "$payload"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
           echo "$response" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
               const d=JSON.parse(s);
               if(!d.success) throw new Error("Cloudflare Workflow create/update failed: "+JSON.stringify(d.errors||[]));
-              console.log("Cloudflare maintenance Workflow created/updated.");
+              if(d.result?.class_name!=="NowPulseMaintenanceWorkflow") throw new Error("Unexpected Workflow class");
+              console.log("Cloudflare maintenance Workflow is provisioned.");
             });
           '
-          sleep 5
           body="$(curl -fsSL --max-time 20             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
-          echo "$body" | tee /tmp/nowpulse-workflow.json
           echo "$body" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
               const d=JSON.parse(s);
-              const schedules=d?.result?.schedules||[];
-              if(!d.success) throw new Error("Cloudflare Workflow API returned success=false");
-              if(!schedules.some(x=>x.cron==="*/15 * * * *")) throw new Error("nowpulse-maintenance is not scheduled every 15 minutes in Cloudflare");
-              console.log("Cloudflare maintenance Workflow schedule verified.");
+              if(!d.success) throw new Error("Cloudflare Workflow lookup failed");
+              if(d.result?.name!=="nowpulse-maintenance") throw new Error("Workflow name mismatch");
+              if(d.result?.script_name!=="nowpulse") throw new Error("Workflow script mismatch");
+              console.log("Cloudflare maintenance Workflow lookup verified.");
             });
           '
 
