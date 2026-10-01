@@ -25,14 +25,23 @@ jobs:
       - name: Check Worker syntax
         run: node --check src/worker.js
 
-      - name: Check AI Manager syntax
-        run: node --check ai-manager.js
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/worker.js
+          node --check src/ai-guardian.js
+          node --check src/nowpulse-maintenance-workflow.js
+          node --check ai-manager.js
 
       - name: Validate required files
         run: |
           test -f src/worker.js
           test -f wrangler.jsonc
           test -f ai-manager.js
+          test -f src/ai-guardian.js
+          test -f src/nowpulse-maintenance-workflow.js
 
       - name: Verify Cloudflare deployment credentials
         shell: bash
@@ -69,6 +78,16 @@ jobs:
           done
           echo "Production health check failed after deployment."
           exit 1
+
+      - name: Verify production APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://nowpulse.tavengers16.workers.dev"
+          curl -fsSL --max-time 20 "$base/api/markets" | grep -q '"usdEgp"'
+          curl -fsSL --max-time 20 "$base/api/ai/status" | grep -q '"version"'
+          curl -fsSL --max-time 20 "$base/sitemap.xml" | grep -q '<urlset'
+          echo "Production API smoke tests passed."
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
