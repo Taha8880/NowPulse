@@ -86,6 +86,7 @@ jobs:
               echo "$body"
               echo "$body" | grep -q '"ok":true'
               echo "$body" | grep -q '"service":"NowPulse"'
+              echo "$body" | grep -q '"version":"6.1.0"'
               echo "Production health check passed."
               exit 0
             fi
@@ -100,7 +101,17 @@ jobs:
         run: |
           set -euo pipefail
           base="https://nowpulse.tavengers16.workers.dev"
-          curl -fsSL --max-time 20 "$base/api/markets" | grep -q '"usdEgp"'
+          markets="$(curl -fsSL --max-time 20 "$base/api/markets")"
+          echo "$markets" | grep -q '"usdEgp"'
+          echo "$markets" | grep -q '"eurEgp"'
+          echo "$markets" | grep -q '"gbpEgp"'
+          echo "$markets" | grep -q '"gold24k"'
+          echo "$markets" | grep -q '"gold21k"'
+          echo "$markets" | grep -q '"gold18k"'
           curl -fsSL --max-time 20 "$base/api/ai/status" | grep -q '"version"'
           curl -fsSL --max-time 20 "$base/sitemap.xml" | grep -q '<urlset'
+          ar_search="$(curl -fsSL --max-time 20 "$base/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar")"
+          echo "$ar_search" | grep -q 'NowPulse'
+          en_search="$(curl -fsSL --max-time 20 "$base/search?q=Egypt&lang=en")"
+          echo "$en_search" | grep -q 'NowPulse'
           echo "Production API smoke tests passed."
