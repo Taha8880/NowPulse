@@ -4,25 +4,26 @@
   "main": "ai-manager.js",
   "compatibility_date": "2026-09-30",
   "preview_urls": false,
-
   "ai": {
     "binding": "AI"
   },
-
   "triggers": {
     "crons": [
-      "*/15 * * * *"
+      "0 * * * *"
     ]
   },
-
   "observability": {
     "enabled": true,
     "logs": {
       "enabled": true
     }
   },
-
-  "kv_namespaces": [{"binding":"NOWPULSE_KV","id":"184c64ea1ed443e1bac081453cd599bf"}],
+  "kv_namespaces": [
+    {
+      "binding": "NOWPULSE_KV",
+      "id": "184c64ea1ed443e1bac081453cd599bf"
+    }
+  ],
   "vars": {
     "NOWPULSE_AI_REPAIR_MODE": "auto",
     "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
