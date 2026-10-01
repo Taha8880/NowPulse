@@ -175,7 +175,7 @@ AUTONOMOUS_OPERATING_POLICY:
 `;
 
 function isAuthorized(request, env){
-  const configured=env.AI_MANAGER_AUTH_TOKEN||env.GITHUB_TOKEN||"";
+  const configured=env.AI_MANAGER_AUTH_TOKEN||env.NOWPULSE_GITHUB_TOKEN||"";
   if(!configured)return false;
   const header=request.headers.get("authorization")||"";
   return header===`Bearer ${configured}`;
