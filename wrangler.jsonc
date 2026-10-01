@@ -12,5 +12,5 @@
     "NOWPULSE_VERSION":"9.0.0",
     "ADSENSE_PUBLISHER_ID":"ca-pub-1235197294708204"
   },
-  "compatibility_flags":["nodejs_compat"]
+  "compatibility_flags":["nodejs_compat"],"durable_objects":{"bindings":[{"name":"NowPulseGuardian","class_name":"NowPulseGuardian"}]}
 }
