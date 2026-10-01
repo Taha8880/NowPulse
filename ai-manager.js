@@ -18,7 +18,8 @@ const ALLOWED_REPAIR_FILES = new Set([
   "package.json",
   "src/ai-guardian.js",
   "src/nowpulse-maintenance-workflow.js",
-  "AGENTS.md"
+  "AGENTS.md",
+  "AI_MEMORY.md"
 ]);
 
 const REQUIRED_FILES = [
@@ -30,7 +31,8 @@ const REQUIRED_FILES = [
   ".github/workflows/deploy-ai-manager.yml",
   "src/ai-guardian.js",
   "src/nowpulse-maintenance-workflow.js",
-  "AGENTS.md"
+  "AGENTS.md",
+  "AI_MEMORY.md"
 ];
 
 const REQUIRED_FEATURES = [

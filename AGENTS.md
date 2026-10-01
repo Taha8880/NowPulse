@@ -15,3 +15,5 @@ The maintenance AI must:
 - when evidence is insufficient, preserve the working behavior and record the uncertainty.
 
 The AI is an autonomous maintainer, not an uncontrolled code generator.
+
+- Read AI_MEMORY.md as persistent product context before autonomous audits and repairs.
