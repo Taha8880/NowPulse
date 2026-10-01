@@ -146,6 +146,14 @@ function queryFor(cat,lang){
  return q[cat]||q.latest ? (q[cat]||q.latest)+base : q.latest+base;
 }
 
+async function gdeltFeed(q,lang){
+ try{
+  const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=20&format=rss&timespan=1d&sort=HybridRel";
+  const items=parseRss(await fetchText(u),lang==="ar"?"GDELT":"GDELT");
+  return items;
+ }catch{return[]}
+}
+
 async function feed(env,lang,cat="latest"){
  const key="np9:feed:"+lang+":"+cat;
  const old=await cacheRead(env,key);
@@ -161,6 +169,10 @@ async function feed(env,lang,cat="latest"){
  const all=[];
  for(const [region,url] of urls){
   try{all.push(...parseRss(await fetchText(url),region))}catch{}
+ }
+ if(!all.length){
+  const fallback=await gdeltFeed(q,lang);
+  all.push(...fallback);
  }
  const data=dedupe(all).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,36);
  if(data.length)await cacheWrite(env,key,data,TTL.news);
