@@ -76,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${NOWPULSE_GITHUB_TOKEN:-}"
-          printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc
+          printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler versions secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc --message "Update NowPulse GitHub maintenance secret"
 
       - name: Ensure Cloudflare maintenance Workflow
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
