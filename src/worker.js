@@ -154,7 +154,7 @@ async function feed(env,lang,cat="latest"){
  const regions=REGIONS[lang]||REGIONS.ar;
  const urls=[
   ["regional", "https://news.google.com/rss/search?q="+encodeURIComponent((cat==="latest"?"Egypt":(ar?"مصر": "Egypt"))+" when:1d")+"&hl="+(ar?"ar":"en-US")+"&gl="+(ar?"EG":"US")+"&ceid="+(ar?"EG:ar":"US:en")],
-  ["arab", "https://news.google.com/rss/search?q="+encodeURIComponent((cat==="politics"?"politics ": "")+(ar?"العالم العربي":"Arab World")+" when:1d")+"&hl="+(ar?"ar":"en-US")+"&gl="+(ar?"EG":"US")+"&ceid="+(ar?"EG:ar":"US:en"),
+  ["arab", "https://news.google.com/rss/search?q="+encodeURIComponent((cat==="politics"?"politics ": "")+(ar?"العالم العربي":"Arab World")+" when:1d")+"&hl="+(ar?"ar":"en-US")+"&gl="+(ar?"EG":"US")+"&ceid="+(ar?"EG:ar":"US:en")],
   ["world", "https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+(ar?"ar":"en-US")+"&gl="+(ar?"EG":"US")+"&ceid="+(ar?"EG:ar":"US:en")]
  ];
  const all=[];
