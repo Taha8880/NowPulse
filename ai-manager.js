@@ -12,7 +12,6 @@ const ALLOWED_REPAIR_FILES = new Set([
   "ai-manager.js",
   "wrangler.jsonc",
   "ai-manager.wrangler.jsonc",
-  ".github/workflows/deploy.yml",
   ".github/workflows/deploy-ai-manager.yml",
   ".github/workflows/validate-pr.yml",
   ".github/workflows/self-heal.yml",
@@ -20,7 +19,6 @@ const ALLOWED_REPAIR_FILES = new Set([
   "src/ai-guardian.js",
   "src/nowpulse-maintenance-workflow.js",
   ".github/workflows/ai-repair-auto-merge.yml",
-  ".github/workflows/deploy.yml",
   ".github/workflows/deploy-ai-manager.yml",
   "AGENTS.md",
   "AI_MEMORY.md"
