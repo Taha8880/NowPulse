@@ -27,10 +27,10 @@ const DIRECT_FALLBACK_FEEDS=[
 const FEEDS=[
  ["egypt","https://news.google.com/rss/search?q=Egypt+OR+Cairo+OR+Alexandria+OR+Giza+OR+Hurghada+OR+Luxor+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["egypt","https://news.google.com/rss/search?q=مصر+OR+القاهرة+OR+الإسكندرية+OR+الجيزة+OR+الغردقة+OR+الأقصر+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
- ["egypt","https://news.google.com/rss/search?q=Egypt+government+OR+Egypt+economy+OR+Egypt+sports+when:2d&hl=en&gl=EG&ceid=EG:en"],
+
  ["politics","https://news.google.com/rss/search?q=سياسة+OR+سياسي+OR+حكومة+OR+برلمان+OR+رئيس+OR+انتخابات+OR+دبلوماسية+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["politics","https://news.google.com/rss/search?q=الولايات+المتحدة+OR+ترامب+OR+أوروبا+OR+روسيا+OR+أوكرانيا+OR+الصين+OR+إيران+OR+إسرائيل+OR+غزة+OR+الأمم+المتحدة+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
- ["politics","https://news.google.com/rss/search?q=world+politics+OR+international+politics+OR+Trump+OR+Putin+OR+China+OR+Ukraine+OR+Iran+OR+Israel+when:2d&hl=en&gl=US&ceid=US:en"],
+
  ["sports","https://news.google.com/rss/search?q=Egypt+football+OR+Al+Ahly+OR+Zamalek+OR+Mohamed+Salah+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["economy","https://news.google.com/rss/search?q=Egypt+economy+OR+Egypt+pound+OR+gold+OR+dollar+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["tech","https://news.google.com/rss/search?q=Egypt+technology+OR+AI+OR+telecom+when:3d&hl=ar&gl=EG&ceid=EG:ar"],
@@ -40,10 +40,10 @@ const FEEDS=[
  ["world","https://news.google.com/rss/search?q=العراق+OR+الأردن+OR+لبنان+OR+سوريا+OR+فلسطين+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["world","https://news.google.com/rss/search?q=المغرب+OR+الجزائر+OR+تونس+OR+ليبيا+OR+موريتانيا+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
  ["world","https://news.google.com/rss/search?q=السودان+OR+اليمن+OR+الصومال+OR+جيبوتي+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
- ["world","https://news.google.com/rss/search?q=Saudi+Arabia+OR+UAE+OR+Qatar+OR+Kuwait+OR+Bahrain+OR+Oman+when:2d&hl=en&gl=SA&ceid=SA:en"],
- ["world","https://news.google.com/rss/search?q=Iraq+OR+Jordan+OR+Lebanon+OR+Syria+OR+Palestine+when:2d&hl=en&gl=JO&ceid=JO:en"],
- ["world","https://news.google.com/rss/search?q=Morocco+OR+Algeria+OR+Tunisia+OR+Libya+when:2d&hl=en&gl=MA&ceid=MA:en"],
- ["world","https://news.google.com/rss/search?q=Sudan+OR+Yemen+OR+Somalia+when:2d&hl=en&gl=SA&ceid=SA:en"],
+
+
+
+
  ["sports","https://news.google.com/rss/search?q=Arab+football+OR+Saudi+football+OR+Qatar+football+OR+UAE+football+when:2d&hl=ar&gl=SA&ceid=SA:ar"],
  ["economy","https://news.google.com/rss/search?q=Saudi+economy+OR+UAE+economy+OR+Qatar+economy+OR+Arab+markets+when:2d&hl=en&gl=SA&ceid=SA:en"],
  ["world","https://news.google.com/rss/search?q=Middle+East+OR+Arab+world+when:2d&hl=ar&gl=EG&ceid=EG:ar"],
