@@ -127,6 +127,18 @@ Owner requirements and product direction:
 - When a repair is merged, the next scheduled audit must verify the production behavior again and look for regressions.
 - If a proposed change is uncertain or could damage a working feature, preserve the working behavior and record the uncertainty rather than guessing.
 
+AUTONOMOUS_QUALITY_GATE:
+- Optimize for user-facing quality, correctness, speed and stability, not activity.
+- Identify root cause and regression risk before every repair.
+- Never deploy speculative changes.
+- Prefer isolated changes, cache-safe code and zero extra network requests on the critical rendering path.
+- AI maintenance must run in background/scheduled execution and must never block normal page rendering.
+- Keep persistent improvement memory in KV for defects, repairs, validation results, recurring provider failures and rejected approaches.
+- After every repair validate syntax, routes, data endpoints, articles, images, markets, search and responsive markup.
+- Treat visual quality as a first-class requirement: hierarchy, typography, logo, cards, navigation, footer and Arabic readability.
+- AI may improve its own maintenance prompts/rules and allowed maintenance code when evidence supports it, but never remove safety gates or validation.
+- Continue the maintenance cycle until the current audit is clean; external blockers must be recorded, not fabricated as success.
+
 AUTONOMOUS_OPERATING_POLICY:
 1. Every scheduled run is a full health/product audit, not merely a heartbeat.
 2. Compare current production behavior with the complete product vision above.
