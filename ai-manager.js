@@ -1,21 +1,14 @@
-const VERSION = "8.0.0";
+const VERSION = "8.1.0";
 
-const REPOSITORY =
-  "Taha8880/NowPulse";
-
-const DEFAULT_BRANCH =
-  "main";
-
-const WORKER_FILE =
-  "src/worker.js";
-
-const AI_MODEL =
-  "@cf/meta/llama-3.1-8b-instruct-fast";
+const REPOSITORY = "Taha8880/NowPulse";
+const DEFAULT_BRANCH = "main";
+const WORKER_FILE = "src/worker.js";
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 
 const ALLOWED_REPAIR_FILES = new Set([
   "src/worker.js",
-  "wrangler.jsonc",
   "ai-manager.js",
+  "wrangler.jsonc",
   "ai-manager.wrangler.jsonc",
   ".github/workflows/deploy.yml",
   ".github/workflows/deploy-ai-manager.yml"
@@ -31,31 +24,19 @@ const REQUIRED_FILES = [
 ];
 
 const REQUIRED_FEATURES = [
-  ["fetch handler", /export\s+default\s*\{[\s\S]*?fetch\s*\(/],
-  ["scheduled handler", /scheduled\s*\(/],
+  ["fetch handler", /\bexport\s+default\s+[\s\S]*?\bfetch\s*\(/i],
+  ["scheduled handler", /\bscheduled\s*\(/i],
   ["Created by Taha", /Created\s+by\s+Taha/i],
-  ["AI binding", /env\.AI|AI_MODEL/],
-  ["KV binding", /NOWPULSE_KV/],
-  ["RSS/news feeds", /rss|feed|xmlItems/i],
-  ["article rendering", /articleBody|homeBody|card/i],
-  ["search", /searchNews/i],
+  ["AI binding", /\bAI\b/i],
+  ["KV binding", /NOWPULSE_KV/i],
+  ["RSS/news feeds", /\bRSS\b|rss|FEEDS/i],
+  ["article rendering", /articleBody|article|renderArticle/i],
+  ["search", /search/i],
   ["sitemap", /sitemap/i]
 ];
 
-const PROTECTED_FEATURES = [
-  "Created by Taha",
-  "NOWPULSE_KV",
-  "AI_MODEL",
-  "searchNews",
-  "sitemap",
-  "scheduled",
-  "export default",
-  "articleBody",
-  "homeBody"
-];
-
 const PROJECT_RULES = `
-You are the repair engine for the NowPulse Cloudflare Worker.
+You are the maintenance AI for the NowPulse project.
 
 Repository:
 Taha8880/NowPulse
@@ -63,336 +44,201 @@ Taha8880/NowPulse
 Main Worker:
 src/worker.js
 
-Rules:
+Runtime:
+Cloudflare Workers
 
-1. This is a Cloudflare Worker project.
-2. Do not use Node-only server APIs in Worker code.
-3. Do not use process.env.
-4. Do not use require().
-5. Do not use fs.
-6. Do not use child_process.
-7. Do not use __dirname.
-8. Do not use __filename.
-9. Browser APIs such as window, document and localStorage are allowed ONLY
-   inside the CLIENT template/string intended for browser execution.
-10. Keep the Worker compatible with Cloudflare Workers.
-11. Preserve existing working functionality.
-12. Never remove the "Created by Taha" footer.
-13. Preserve Arabic RTL and English LTR support.
-14. Preserve news, search, weather, markets, sitemap and scheduled functionality.
-15. Never hard-code GitHub tokens, API keys or secrets.
-16. Never modify files outside the allowed repair files.
-17. Do not invent news.
-18. Do not fabricate images, prices, currencies, weather or market data.
-19. News should remain accessible even when external sources fail.
-20. External API failure must degrade gracefully.
-21. Do not make page rendering depend on slow image or AI requests.
-22. Keep the public site responsive on mobile, tablet and desktop.
-23. Do not introduce ?m=1 mobile routing.
-24. Do not replace the entire project with a different architecture.
-25. Make the smallest complete-file repair necessary.
-26. Return valid JSON only.
+Required bindings:
+AI
+NOWPULSE_KV
+
+Core requirements:
+1. News must be visible without user interests.
+2. Arabic and English must work.
+3. RTL and LTR must work correctly.
+4. Desktop, tablet and mobile must work.
+5. Search must support arbitrary people and topics.
+6. Search must support Arabic and English.
+7. Articles must be readable inside NowPulse.
+8. AI articles must synthesize multiple sources.
+9. Images must not block article rendering.
+10. Image fallback must exist.
+11. Weather must exist.
+12. Gold, currency and market data must exist.
+13. Sitemap must exist.
+14. robots.txt must exist.
+15. RSS/news feeds must exist.
+16. Trends must exist.
+17. SEO must exist.
+18. Created by Taha must remain.
+19. Articles must be readable inside NowPulse.
+20. Worker must remain Cloudflare Worker compatible.
+21. Browser APIs are allowed only inside client-side template strings.
+22. Browser APIs must not execute in Worker server code.
+23. Node.js-only APIs must not be introduced.
+24. Secrets must never be hard-coded.
+25. Existing working features must not be deleted.
+26. Never replace the project with a reduced demo.
+27. Never remove AI or KV bindings.
+28. Never expose GITHUB_TOKEN.
+29. Only modify the NowPulse repository.
+30. Political/news content must remain factual and neutral.
 `;
 
-function text(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return String(value);
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    }
+  });
 }
 
-function json(data, status = 200) {
-  return new Response(
-    JSON.stringify(data, null, 2),
-    {
-      status,
-      headers: {
-        "content-type":
-          "application/json; charset=utf-8",
-        "cache-control":
-          "no-store"
-      }
-    }
-  );
+function text(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function truncate(value, max = 50000) {
-  const s = text(value);
-
-  if (s.length <= max) {
-    return s;
-  }
-
-  return (
-    s.slice(0, max) +
-    "\n/* truncated */"
-  );
+  const valueText = text(value);
+  return valueText.length > max
+    ? valueText.slice(0, max) + "\n/* truncated */"
+    : valueText;
 }
 
 function githubHeaders(env) {
-  const token =
-    env.GITHUB_TOKEN;
+  const token = env.GITHUB_TOKEN;
 
   if (!token) {
-    throw new Error(
-      "GITHUB_TOKEN secret is missing."
-    );
+    throw new Error("GITHUB_TOKEN secret is missing.");
   }
 
   return {
-    Authorization:
-      `Bearer ${token}`,
-
-    Accept:
-      "application/vnd.github+json",
-
-    "X-GitHub-Api-Version":
-      "2022-11-28",
-
-    "User-Agent":
-      "NowPulse-AI-Manager/8.0.0",
-
-    "Content-Type":
-      "application/json"
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json",
+    "User-Agent": `NowPulse-AI-Manager/${VERSION}`
   };
 }
 
-async function readGitHubResponse(response) {
-  const body =
-    await response.text();
+async function github(env, path, options = {}) {
+  const response = await fetch(
+    `https://api.github.com/repos/${REPOSITORY}${path}`,
+    {
+      ...options,
+      headers: {
+        ...githubHeaders(env),
+        ...(options.headers || {})
+      }
+    }
+  );
+
+  const body = await response.text();
 
   let data;
 
   try {
-    data =
-      body
-        ? JSON.parse(body)
-        : {};
+    data = body ? JSON.parse(body) : {};
   } catch {
     data = {
       raw: body
     };
   }
 
-  return {
-    data,
-    body
-  };
-}
-
-async function github(
-  env,
-  path,
-  options = {}
-) {
-  const response =
-    await fetch(
-      `https://api.github.com${path}`,
-      {
-        ...options,
-        headers: {
-          ...githubHeaders(env),
-          ...(options.headers || {})
-        }
-      }
-    );
-
-  const {
-    data,
-    body
-  } =
-    await readGitHubResponse(
-      response
-    );
-
   if (!response.ok) {
     const message =
       data?.message ||
       data?.error ||
-      body ||
       `GitHub API error ${response.status}`;
 
     const acceptedPermissions =
-      response.headers.get(
-        "X-Accepted-GitHub-Permissions"
-      ) || "";
+      response.headers.get("X-Accepted-GitHub-Permissions") || "";
 
     const oauthScopes =
-      response.headers.get(
-        "X-OAuth-Scopes"
-      ) || "";
+      response.headers.get("X-OAuth-Scopes") || "";
 
     const documentation =
-      response.headers.get(
-        "documentation_url"
-      ) || "";
-
-    const details = [
-      `GitHub API ${response.status}`,
-      `message=${message}`,
-
-      acceptedPermissions
-        ? `accepted_permissions=${acceptedPermissions}`
-        : "",
-
-      oauthScopes
-        ? `oauth_scopes=${oauthScopes}`
-        : "",
-
-      documentation
-        ? `documentation=${documentation}`
-        : ""
-    ].filter(Boolean);
+      response.headers.get("documentation_url") || "";
 
     throw new Error(
-      details.join(" | ")
+      [
+        `GitHub API ${response.status}`,
+        `message=${message}`,
+        acceptedPermissions
+          ? `accepted_permissions=${acceptedPermissions}`
+          : "",
+        oauthScopes
+          ? `oauth_scopes=${oauthScopes}`
+          : "",
+        documentation
+          ? `documentation=${documentation}`
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" | ")
     );
   }
 
   return data;
 }
 
-async function githubRaw(
-  env,
-  path,
-  options = {}
-) {
-  const response =
-    await fetch(
-      `https://api.github.com${path}`,
-      {
-        ...options,
-        headers: {
-          ...githubHeaders(env),
-          ...(options.headers || {})
-        }
-      }
-    );
+async function githubRaw(env, path, options = {}) {
+  try {
+    const data = await github(env, path, options);
 
-  const {
-    data,
-    body
-  } =
-    await readGitHubResponse(
-      response
-    );
-
-  return {
-    status: response.status,
-    ok: response.ok,
-    data,
-    body: truncate(body, 4000),
-    headers: {
-      acceptedPermissions:
-        response.headers.get(
-          "X-Accepted-GitHub-Permissions"
-        ) || "",
-
-      oauthScopes:
-        response.headers.get(
-          "X-OAuth-Scopes"
-        ) || "",
-
-      documentation:
-        response.headers.get(
-          "documentation_url"
-        ) || "",
-
-      requestId:
-        response.headers.get(
-          "x-github-request-id"
-        ) || ""
-    }
-  };
+    return {
+      ok: true,
+      status: 200,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      error: text(error?.message || error)
+    };
+  }
 }
 
 async function getRepository(env) {
+  return github(env, "");
+}
+
+async function getBranch(env, branch = DEFAULT_BRANCH) {
   return github(
     env,
-    `/repos/${REPOSITORY}`
+    `/branches/${encodeURIComponent(branch)}`
   );
 }
 
-async function getBranch(
-  env,
-  branch = DEFAULT_BRANCH
-) {
+async function getTree(env, branch = DEFAULT_BRANCH) {
   return github(
     env,
-    `/repos/${REPOSITORY}/branches/${encodeURIComponent(branch)}`
+    `/git/trees/${encodeURIComponent(branch)}?recursive=1`
   );
 }
 
-async function getTree(
-  env,
-  branch = DEFAULT_BRANCH
-) {
-  const branchData =
-    await getBranch(
-      env,
-      branch
-    );
+function decodeBase64Utf8(value) {
+  const clean = text(value).replace(/\s/g, "");
+  const binary = atob(clean);
 
-  const sha =
-    branchData?.commit?.sha;
+  const bytes = new Uint8Array(binary.length);
 
-  if (!sha) {
-    throw new Error(
-      `GitHub branch SHA unavailable: ${branch}`
-    );
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
 
-  return github(
-    env,
-    `/repos/${REPOSITORY}/git/trees/${sha}?recursive=1`
-  );
+  return new TextDecoder().decode(bytes);
 }
 
-function base64DecodeUtf8(value) {
-  const normalized =
-    text(value)
-      .replace(/\s/g, "");
-
-  const binary =
-    atob(normalized);
-
-  const bytes =
-    Uint8Array.from(
-      binary,
-      char => char.charCodeAt(0)
-    );
-
-  return new TextDecoder()
-    .decode(bytes);
-}
-
-function base64EncodeUtf8(value) {
-  const bytes =
-    new TextEncoder()
-      .encode(text(value));
+function encodeBase64Utf8(value) {
+  const bytes = new TextEncoder().encode(value);
 
   let binary = "";
 
-  const chunkSize =
-    0x8000;
-
-  for (
-    let i = 0;
-    i < bytes.length;
-    i += chunkSize
-  ) {
-    const chunk =
-      bytes.subarray(
-        i,
-        Math.min(
-          i + chunkSize,
-          bytes.length
-        )
-      );
-
+  for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(
-      ...chunk
+      ...bytes.subarray(i, i + 0x8000)
     );
   }
 
@@ -404,16 +250,12 @@ async function getFile(
   path,
   branch = DEFAULT_BRANCH
 ) {
-  const data =
-    await github(
-      env,
-      `/repos/${REPOSITORY}/contents/${path}?ref=${encodeURIComponent(branch)}`
-    );
+  const data = await github(
+    env,
+    `/contents/${path}?ref=${encodeURIComponent(branch)}`
+  );
 
-  if (
-    !data ||
-    !data.content
-  ) {
+  if (!data?.content) {
     throw new Error(
       `GitHub file content unavailable: ${path}`
     );
@@ -421,50 +263,414 @@ async function getFile(
 
   return {
     path,
-    sha: data.sha || "",
-    content:
-      base64DecodeUtf8(
-        data.content
-      )
+    sha: data.sha,
+    content: decodeBase64Utf8(data.content)
+  };
+}
+
+/*
+ * Lightweight JavaScript delimiter scanner.
+ *
+ * Important:
+ * It understands strings, comments and regular-expression
+ * literals so characters such as ] inside:
+ *
+ * /foo[bar]baz/
+ *
+ * are NOT treated as JavaScript delimiters.
+ */
+function scanDelimiters(source) {
+  const stack = [];
+
+  const pairs = {
+    "(": ")",
+    "[": "]",
+    "{": "}"
+  };
+
+  const closing = new Set([
+    ")",
+    "]",
+    "}"
+  ]);
+
+  let state = "code";
+  let quote = "";
+  let escaped = false;
+
+  let line = 1;
+  let column = 0;
+
+  let regexAllowed = true;
+
+  function advanceCharacter(c) {
+    if (c === "\n") {
+      line++;
+      column = 0;
+    } else {
+      column++;
+    }
+  }
+
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    const n = source[i + 1];
+
+    if (c === "\n") {
+      if (
+        state === "lineComment" ||
+        state === "regex"
+      ) {
+        if (state === "regex") {
+          return {
+            ok: false,
+            message:
+              `Unterminated regular expression at line ${line}, column ${column}.`
+          };
+        }
+
+        state = "code";
+      }
+
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (state === "lineComment") {
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (state === "blockComment") {
+      if (c === "*" && n === "/") {
+        state = "code";
+        advanceCharacter(c);
+        i++;
+        advanceCharacter("/");
+      } else {
+        advanceCharacter(c);
+      }
+
+      continue;
+    }
+
+    if (state === "string") {
+      if (escaped) {
+        escaped = false;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === "\\") {
+        escaped = true;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === quote) {
+        state = "code";
+        quote = "";
+      }
+
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (state === "regex") {
+      if (escaped) {
+        escaped = false;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === "\\") {
+        escaped = true;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === "[") {
+        advanceCharacter(c);
+
+        let inClass = true;
+        let classEscaped = false;
+
+        for (i++; i < source.length; i++) {
+          const rc = source[i];
+
+          if (rc === "\n") {
+            return {
+              ok: false,
+              message:
+                `Unterminated regular expression character class at line ${line}, column ${column}.`
+            };
+          }
+
+          if (classEscaped) {
+            classEscaped = false;
+            advanceCharacter(rc);
+            continue;
+          }
+
+          if (rc === "\\") {
+            classEscaped = true;
+            advanceCharacter(rc);
+            continue;
+          }
+
+          if (rc === "]") {
+            inClass = false;
+            advanceCharacter(rc);
+            break;
+          }
+
+          advanceCharacter(rc);
+        }
+
+        if (inClass) {
+          return {
+            ok: false,
+            message:
+              `Unterminated regular expression character class at line ${line}, column ${column}.`
+          };
+        }
+
+        continue;
+      }
+
+      if (c === "/") {
+        state = "code";
+        regexAllowed = false;
+
+        advanceCharacter(c);
+
+        while (i + 1 < source.length) {
+          const flag = source[i + 1];
+
+          if (!/[a-z]/i.test(flag)) {
+            break;
+          }
+
+          i++;
+          advanceCharacter(flag);
+        }
+
+        continue;
+      }
+
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (state === "template") {
+      if (escaped) {
+        escaped = false;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === "\\") {
+        escaped = true;
+        advanceCharacter(c);
+        continue;
+      }
+
+      if (c === "`") {
+        state = "code";
+        regexAllowed = false;
+      }
+
+      advanceCharacter(c);
+      continue;
+    }
+
+    /*
+     * code state
+     */
+
+    if (c === "/" && n === "/") {
+      state = "lineComment";
+      advanceCharacter(c);
+      i++;
+      advanceCharacter("/");
+      continue;
+    }
+
+    if (c === "/" && n === "*") {
+      state = "blockComment";
+      advanceCharacter(c);
+      i++;
+      advanceCharacter("*");
+      continue;
+    }
+
+    if (
+      c === "'" ||
+      c === '"'
+    ) {
+      state = "string";
+      quote = c;
+      escaped = false;
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (c === "`") {
+      state = "template";
+      advanceCharacter(c);
+      continue;
+    }
+
+    /*
+     * Detect likely regular expressions.
+     *
+     * A slash after operators, opening delimiters or
+     * certain keywords is normally a regex literal.
+     */
+    if (c === "/") {
+      const before = source
+        .slice(0, i)
+        .trimEnd();
+
+      const previous = before.at(-1) || "";
+
+      const regexContext =
+        regexAllowed ||
+        !previous ||
+        /[=(:,!&|?{};[\]]/.test(previous) ||
+        /\b(return|throw|case|delete|typeof|void|new|in|of|instanceof)\s*$/.test(
+          before
+        );
+
+      if (regexContext) {
+        state = "regex";
+        advanceCharacter(c);
+        continue;
+      }
+    }
+
+    if (pairs[c]) {
+      stack.push({
+        open: c,
+        line,
+        column: column + 1
+      });
+
+      regexAllowed = true;
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (closing.has(c)) {
+      if (!stack.length) {
+        return {
+          ok: false,
+          message:
+            `Unexpected closing ${c} at line ${line}, column ${column + 1}.`
+        };
+      }
+
+      const last = stack.pop();
+      const expected = pairs[last.open];
+
+      if (expected !== c) {
+        return {
+          ok: false,
+          message:
+            `Mismatched closing ${c} at line ${line}, column ${column + 1}. ` +
+            `Expected ${expected}.`
+        };
+      }
+
+      regexAllowed = true;
+      advanceCharacter(c);
+      continue;
+    }
+
+    if (
+      /[=,:;!?&|+\-*%^<>]/.test(c)
+    ) {
+      regexAllowed = true;
+    } else if (
+      /[A-Za-z0-9_$'"`]/.test(c)
+    ) {
+      regexAllowed = false;
+    }
+
+    advanceCharacter(c);
+  }
+
+  if (state === "string") {
+    return {
+      ok: false,
+      message:
+        `Unclosed string literal near line ${line}.`
+    };
+  }
+
+  if (state === "blockComment") {
+    return {
+      ok: false,
+      message:
+        `Unclosed block comment near line ${line}.`
+    };
+  }
+
+  if (state === "regex") {
+    return {
+      ok: false,
+      message:
+        `Unclosed regular expression near line ${line}.`
+    };
+  }
+
+  if (state === "template") {
+    return {
+      ok: false,
+      message:
+        `Unclosed template literal near line ${line}.`
+    };
+  }
+
+  if (stack.length) {
+    const last = stack[stack.length - 1];
+
+    return {
+      ok: false,
+      message:
+        `Unclosed delimiter ${last.open} opened at line ${last.line}, column ${last.column}.`
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Delimiter structure is balanced."
   };
 }
 
 function maskCode(source) {
-  const s =
-    text(source);
-
   let output = "";
 
   let state = "code";
   let quote = "";
   let escaped = false;
 
-  for (
-    let i = 0;
-    i < s.length;
-    i++
-  ) {
-    const c = s[i];
-    const next = s[i + 1];
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    const n = source[i + 1];
 
     if (state === "code") {
-      if (
-        c === "/" &&
-        next === "/"
-      ) {
+      if (c === "/" && n === "/") {
         output += "  ";
-        state = "line-comment";
         i++;
+        state = "lineComment";
         continue;
       }
 
-      if (
-        c === "/" &&
-        next === "*"
-      ) {
+      if (c === "/" && n === "*") {
         output += "  ";
-        state = "block-comment";
         i++;
+        state = "blockComment";
         continue;
       }
 
@@ -474,7 +680,6 @@ function maskCode(source) {
         c === "`"
       ) {
         quote = c;
-        escaped = false;
         output += " ";
         state = "string";
         continue;
@@ -484,9 +689,7 @@ function maskCode(source) {
       continue;
     }
 
-    if (
-      state === "line-comment"
-    ) {
+    if (state === "lineComment") {
       if (c === "\n") {
         output += "\n";
         state = "code";
@@ -497,35 +700,21 @@ function maskCode(source) {
       continue;
     }
 
-    if (
-      state === "block-comment"
-    ) {
-      if (
-        c === "*" &&
-        next === "/"
-      ) {
+    if (state === "blockComment") {
+      if (c === "*" && n === "/") {
         output += "  ";
-        state = "code";
         i++;
+        state = "code";
       } else {
-        output +=
-          c === "\n"
-            ? "\n"
-            : " ";
+        output += c === "\n" ? "\n" : " ";
       }
 
       continue;
     }
 
-    if (
-      state === "string"
-    ) {
+    if (state === "string") {
       if (escaped) {
-        output +=
-          c === "\n"
-            ? "\n"
-            : " ";
-
+        output += c === "\n" ? "\n" : " ";
         escaped = false;
         continue;
       }
@@ -542,193 +731,43 @@ function maskCode(source) {
         continue;
       }
 
-      output +=
-        c === "\n"
-          ? "\n"
-          : " ";
+      output += c === "\n" ? "\n" : " ";
     }
   }
 
   return output;
 }
 
-function scanDelimiters(source) {
-  const masked =
-    maskCode(source);
+function detectWorkerBrowserApis(source) {
+  const code = maskCode(source);
 
-  const stack = [];
+  const found = [];
 
-  const opening = {
-    "(": ")",
-    "[": "]",
-    "{": "}"
-  };
-
-  const closing =
-    new Set([
-      ")",
-      "]",
-      "}"
-    ]);
-
-  const lineStarts = [0];
-
-  for (
-    let i = 0;
-    i < masked.length;
-    i++
-  ) {
-    if (
-      masked[i] === "\n"
-    ) {
-      lineStarts.push(i + 1);
-    }
-  }
-
-  function location(index) {
-    let low = 0;
-    let high =
-      lineStarts.length - 1;
-
-    while (low <= high) {
-      const mid =
-        Math.floor(
-          (low + high) / 2
-        );
-
-      if (
-        lineStarts[mid] <= index
-      ) {
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-
-    const line =
-      high + 1;
-
-    const column =
-      index -
-      lineStarts[high] +
-      1;
-
-    return {
-      line,
-      column
-    };
-  }
-
-  for (
-    let i = 0;
-    i < masked.length;
-    i++
-  ) {
-    const c =
-      masked[i];
-
-    if (opening[c]) {
-      stack.push({
-        expected:
-          opening[c],
-        index: i
-      });
-
-      continue;
-    }
-
-    if (
-      closing.has(c)
-    ) {
-      if (!stack.length) {
-        const loc =
-          location(i);
-
-        return {
-          ok: false,
-          message:
-            `Unexpected closing ${c} at line ${loc.line}, column ${loc.column}.`
-        };
-      }
-
-      const last =
-        stack.pop();
-
-      if (
-        last.expected !== c
-      ) {
-        const loc =
-          location(i);
-
-        return {
-          ok: false,
-          message:
-            `Mismatched closing ${c} at line ${loc.line}, column ${loc.column}. Expected ${last.expected}.`
-        };
-      }
-    }
-  }
-
-  if (stack.length) {
-    const last =
-      stack[stack.length - 1];
-
-    const loc =
-      location(last.index);
-
-    return {
-      ok: false,
-      message:
-        `Unclosed ${last.expected === ")" ? "(" : last.expected === "]" ? "[" : "{"} at line ${loc.line}, column ${loc.column}.`
-    };
-  }
-
-  return {
-    ok: true,
-    message: "Delimiter scan passed."
-  };
-}
-
-function detectWorkerBrowserApis(
-  source
-) {
-  const matches = [];
-
-  const checks = [
-    [/\bwindow\b/, "window"],
-    [/\bdocument\b/, "document"],
-    [/\blocalStorage\b/, "localStorage"],
-    [/\bsessionStorage\b/, "sessionStorage"],
-    [/\bnavigator\b/, "navigator"]
+  const patterns = [
+    /\bwindow\b/,
+    /\bdocument\b/,
+    /\blocalStorage\b/,
+    /\bsessionStorage\b/
   ];
 
-  for (
-    const [pattern, name]
-    of checks
-  ) {
-    if (
-      pattern.test(source)
-    ) {
-      matches.push(name);
+  for (const pattern of patterns) {
+    if (pattern.test(code)) {
+      found.push(pattern.source);
     }
   }
 
-  return [
-    ...new Set(matches)
-  ];
+  return found;
 }
 
-function hasClientTemplate(
-  source
-) {
+function hasClientTemplate(source) {
   return /\b(?:const|let|var)\s+CLIENT\s*=\s*`/.test(
     source
   );
 }
 
-function detectForbiddenServerApis(
-  source
-) {
+function detectForbiddenServerApis(source) {
+  const code = maskCode(source);
+
   const checks = [
     [/\bprocess\.env\b/, "process.env"],
     [/\brequire\s*\(/, "require()"],
@@ -738,76 +777,54 @@ function detectForbiddenServerApis(
     [/\bchild_process\b/, "child_process"]
   ];
 
-  const found = [];
+  const forbidden = [];
 
-  for (
-    const [pattern, name]
-    of checks
-  ) {
-    if (
-      pattern.test(source)
-    ) {
-      found.push(name);
+  for (const [pattern, name] of checks) {
+    if (pattern.test(code)) {
+      forbidden.push(name);
     }
   }
 
-  return found;
+  return forbidden;
 }
 
-function featureChecks(
-  source
-) {
+function featureChecks(source) {
   return REQUIRED_FEATURES.map(
     ([name, pattern]) => ({
       name,
-      present:
-        pattern.test(source)
+      present: pattern.test(source)
     })
   );
 }
 
-function architectureInspection(
-  source
-) {
+function architectureInspection(source) {
   const problems = [];
   const warnings = [];
 
-  const delimiters =
-    scanDelimiters(source);
+  const delimiters = scanDelimiters(source);
 
   if (!delimiters.ok) {
-    problems.push(
-      delimiters.message
-    );
+    problems.push(delimiters.message);
   }
 
   const browserApis =
-    detectWorkerBrowserApis(
-      source
-    );
+    detectWorkerBrowserApis(source);
 
   if (
     browserApis.length &&
     !hasClientTemplate(source)
   ) {
     problems.push(
-      `Browser APIs detected in Worker server code: ${browserApis.join(", ")}`
+      `Browser APIs detected outside a CLIENT template: ${browserApis.join(", ")}`
     );
-  }
-
-  if (
-    browserApis.length &&
-    hasClientTemplate(source)
-  ) {
+  } else if (browserApis.length) {
     warnings.push(
       "Browser APIs exist in the Worker source and may belong to the CLIENT template."
     );
   }
 
   const forbidden =
-    detectForbiddenServerApis(
-      source
-    );
+    detectForbiddenServerApis(source);
 
   if (forbidden.length) {
     problems.push(
@@ -818,9 +835,7 @@ function architectureInspection(
   const features =
     featureChecks(source);
 
-  for (
-    const item of features
-  ) {
+  for (const item of features) {
     if (!item.present) {
       problems.push(
         `Required feature missing: ${item.name}`
@@ -829,34 +844,63 @@ function architectureInspection(
   }
 
   return {
-    ok:
-      problems.length === 0,
-
+    ok: problems.length === 0,
     problems,
-
     warnings,
-
     features
   };
 }
 
-async function inspectProject(
-  env
-) {
+function configurationInspection(source) {
+  const problems = [];
+
+  if (
+    !/"name"\s*:\s*"nowpulse"/.test(source)
+  ) {
+    problems.push(
+      "wrangler.jsonc does not appear to target the nowpulse Worker."
+    );
+  }
+
+  if (
+    !/"main"\s*:\s*"src\/worker\.js"/.test(source)
+  ) {
+    problems.push(
+      "wrangler.jsonc main should be src/worker.js."
+    );
+  }
+
+  if (
+    !/"binding"\s*:\s*"AI"/.test(source)
+  ) {
+    problems.push(
+      "Workers AI binding AI was not found."
+    );
+  }
+
+  if (
+    !/"binding"\s*:\s*"NOWPULSE_KV"/.test(source)
+  ) {
+    problems.push(
+      "KV binding NOWPULSE_KV was not found."
+    );
+  }
+
+  return {
+    ok: problems.length === 0,
+    problems
+  };
+}
+
+async function inspectProject(env) {
   const repository =
     await getRepository(env);
 
   const branch =
-    await getBranch(
-      env,
-      DEFAULT_BRANCH
-    );
+    await getBranch(env, DEFAULT_BRANCH);
 
   const tree =
-    await getTree(
-      env,
-      DEFAULT_BRANCH
-    );
+    await getTree(env, DEFAULT_BRANCH);
 
   const worker =
     await getFile(
@@ -880,124 +924,65 @@ async function inspectProject(
     );
 
   const workerArchitecture =
-    architectureInspection(
-      worker.content
-    );
+    architectureInspection(worker.content);
 
-  const managerScan =
-    scanDelimiters(
-      manager.content
-    );
+  const managerDelimiters =
+    scanDelimiters(manager.content);
 
   const managerProblems = [];
 
-  if (!managerScan.ok) {
+  if (!managerDelimiters.ok) {
     managerProblems.push(
-      managerScan.message
+      managerDelimiters.message
     );
   }
 
-  const configProblems = [];
-
-  if (
-    !/"name"\s*:\s*"nowpulse"/.test(
+  const configuration =
+    configurationInspection(
       config.content
-    )
-  ) {
-    configProblems.push(
-      "wrangler.jsonc does not appear to target the nowpulse Worker."
     );
-  }
 
-  if (
-    !/"main"\s*:\s*"src\/worker\.js"/.test(
-      config.content
+  const treePaths = new Set(
+    (tree.tree || []).map(
+      item => item.path
     )
-  ) {
-    configProblems.push(
-      "wrangler.jsonc main should be src/worker.js."
-    );
-  }
-
-  if (
-    !/"binding"\s*:\s*"AI"/.test(
-      config.content
-    )
-  ) {
-    configProblems.push(
-      "Workers AI binding AI was not found."
-    );
-  }
-
-  if (
-    !/"binding"\s*:\s*"NOWPULSE_KV"/.test(
-      config.content
-    )
-  ) {
-    configProblems.push(
-      "KV binding NOWPULSE_KV was not found."
-    );
-  }
-
-  const treePaths =
-    new Set(
-      (tree.tree || [])
-        .map(
-          item => item.path
-        )
-    );
+  );
 
   const missingFiles =
     REQUIRED_FILES.filter(
-      file =>
-        !treePaths.has(file)
+      file => !treePaths.has(file)
     );
 
-  const deploymentProblems =
-    [];
+  const deploymentProblems = [];
 
-  if (
-    missingFiles.length
-  ) {
+  if (missingFiles.length) {
     deploymentProblems.push(
-      `Missing required files: ${missingFiles.join(", ")}`
+      `Required files missing: ${missingFiles.join(", ")}`
     );
   }
 
-  const files =
-    (tree.tree || [])
-      .filter(
-        item =>
-          item.type === "blob"
-      )
-      .map(
-        item =>
-          item.path
-      )
-      .filter(
-        path =>
-          path.startsWith(
-            ".github/"
-          ) ||
-          path.startsWith(
-            "src/"
-          ) ||
-          path ===
-            "ai-manager.js" ||
-          path ===
-            "ai-manager.wrangler.jsonc" ||
-          path ===
-            "wrangler.jsonc"
-      );
-
-  const ok =
-    workerArchitecture.ok &&
-    managerProblems.length === 0 &&
-    configProblems.length === 0 &&
-    deploymentProblems.length === 0;
+  const files = (tree.tree || [])
+    .filter(
+      item => item.type === "blob"
+    )
+    .map(
+      item => item.path
+    )
+    .filter(
+      path =>
+        path.startsWith(".github/") ||
+        path.startsWith("src/") ||
+        path === "ai-manager.js" ||
+        path === "ai-manager.wrangler.jsonc" ||
+        path === "wrangler.jsonc"
+    );
 
   return {
-    ok,
+    ok:
+      workerArchitecture.ok &&
+      managerProblems.length === 0 &&
+      configuration.ok &&
+      deploymentProblems.length === 0,
 
     repository:
       repository.full_name,
@@ -1017,23 +1002,15 @@ async function inspectProject(
     manager: {
       ok:
         managerProblems.length === 0,
-
       problems:
         managerProblems
     },
 
-    configuration: {
-      ok:
-        configProblems.length === 0,
-
-      problems:
-        configProblems
-    },
+    configuration,
 
     deployment: {
       ok:
         deploymentProblems.length === 0,
-
       problems:
         deploymentProblems
     },
@@ -1042,27 +1019,26 @@ async function inspectProject(
   };
 }
 
-function protectedFeatures(
-  source
-) {
+function protectedFeatures(source) {
+  const checks = [
+    ["search", /search/i],
+    ["weather", /weather/i],
+    ["market", /market/i],
+    ["gold", /gold/i],
+    ["currency", /currency/i],
+    ["sitemap", /sitemap/i],
+    ["robots", /robots/i],
+    ["rss", /rss/i],
+    ["article", /article/i],
+    ["trend", /trend/i],
+    ["image", /image/i],
+    ["Created by Taha", /Created\s+by\s+Taha/i]
+  ];
+
   const result = {};
 
-  for (
-    const name of PROTECTED_FEATURES
-  ) {
-    const pattern =
-      name === "Created by Taha"
-        ? /Created\s+by\s+Taha/i
-        : new RegExp(
-            name.replace(
-              /[.*+?^${}()|[\]\\]/g,
-              "\\$&"
-            ),
-            "i"
-          );
-
-    result[name] =
-      pattern.test(source);
+  for (const [name, pattern] of checks) {
+    result[name] = pattern.test(source);
   }
 
   return result;
@@ -1080,11 +1056,7 @@ function compareProtectedFeatures(
 
   const removed = [];
 
-  for (
-    const key of Object.keys(
-      oldFeatures
-    )
-  ) {
+  for (const key of Object.keys(oldFeatures)) {
     if (
       oldFeatures[key] &&
       !newFeatures[key]
@@ -1096,46 +1068,39 @@ function compareProtectedFeatures(
   return removed;
 }
 
-function cleanAIJson(
-  value
-) {
-  let s =
-    text(value).trim();
+function cleanAIJson(value) {
+  let result = text(value).trim();
 
-  if (
-    s.startsWith("```")
-  ) {
-    s =
-      s.replace(
-        /^```(?:json)?/i,
-        ""
-      );
+  if (result.startsWith("```")) {
+    result = result.replace(
+      /^```(?:json)?/i,
+      ""
+    );
 
-    s =
-      s.replace(
-        /```$/i,
-        ""
-      );
+    result = result.replace(
+      /```$/i,
+      ""
+    );
   }
 
   const first =
-    s.indexOf("{");
+    result.indexOf("{");
 
   const last =
-    s.lastIndexOf("}");
+    result.lastIndexOf("}");
 
   if (
     first >= 0 &&
     last > first
   ) {
-    s =
-      s.slice(
+    result =
+      result.slice(
         first,
         last + 1
       );
   }
 
-  return s.trim();
+  return result.trim();
 }
 
 async function askAI(
@@ -1161,49 +1126,44 @@ ${JSON.stringify(
 
 You must decide whether a repair is actually necessary.
 
-If no repair is required:
+If no repair is necessary:
 {
   "repairRequired": false,
   "diagnosis": "...",
-  "validation": [],
   "changes": [],
-  "notes": []
+  "validation": ["..."]
 }
 
-If a repair is required:
+If repair is necessary:
 {
   "repairRequired": true,
   "diagnosis": "...",
-  "validation": [],
   "changes": [
     {
       "path": "src/worker.js",
       "content": "COMPLETE FILE CONTENT"
     }
   ],
-  "notes": []
+  "validation": ["..."],
+  "notes": ["..."]
 }
 
-Rules for changes:
-
-- Every changed file must contain the COMPLETE file.
+Rules:
+- Never return partial files.
 - Never return patches.
-- Never return diff syntax.
-- Never use placeholders.
-- Never use "...".
-- Never omit existing required functionality.
-- Only change files in the allowed repair list.
-- Do not put secrets in any file.
-- Do not remove protected NowPulse functionality.
-- If the problem cannot be safely repaired, return repairRequired=false
-  and explain why.
+- Only modify allowed files.
+- Preserve existing features.
+- Never invent credentials.
+- Never invent bindings.
+- Do not remove CLIENT browser code.
+- Do not rewrite the Worker merely because browser APIs exist in CLIENT.
+- Do not rewrite the entire Worker unless genuinely necessary.
+- Prefer safe complete-file repairs.
+- Never include GITHUB_TOKEN.
+- Worker must remain Cloudflare Worker compatible.
 
 Current Worker source:
-
-${truncate(
-  workerSource,
-  70000
-)}
+${truncate(workerSource, 70000)}
 `;
 
   const result =
@@ -1214,24 +1174,22 @@ ${truncate(
           {
             role: "system",
             content:
-              "You are a conservative production JavaScript repair engineer. Return JSON only."
+              "You are a conservative production JavaScript repair engineer."
           },
           {
             role: "user",
-            content:
-              prompt
+            content: prompt
           }
         ],
-
         temperature: 0.1,
-
         max_tokens: 12000
       }
     );
 
   const raw =
     result?.response ||
-    result?.result ||
+    result?.result?.response ||
+    result?.text ||
     "";
 
   if (!raw) {
@@ -1265,18 +1223,14 @@ function validateRepairPlan(
   }
 
   if (
-    !Array.isArray(
-      plan.changes
-    )
+    !Array.isArray(plan.changes)
   ) {
     throw new Error(
       "AI repair plan has no changes array."
     );
   }
 
-  for (
-    const change of plan.changes
-  ) {
+  for (const change of plan.changes) {
     if (
       !change ||
       typeof change !== "object"
@@ -1297,26 +1251,15 @@ function validateRepairPlan(
     }
 
     if (
-      typeof change.content !==
-      "string"
+      typeof change.content !== "string" ||
+      change.content.length < 20
     ) {
       throw new Error(
-        `Repair content is not a string: ${change.path}`
+        `Repair content is invalid for ${change.path}.`
       );
     }
 
     if (
-      !change.content.trim()
-    ) {
-      throw new Error(
-        `Repair content is empty: ${change.path}`
-      );
-    }
-
-    if (
-      change.content.includes(
-        "GITHUB_TOKEN"
-      ) &&
       /GITHUB_TOKEN\s*[:=]\s*["'`][^"'`]+/.test(
         change.content
       )
@@ -1325,26 +1268,12 @@ function validateRepairPlan(
         `Possible hard-coded secret in ${change.path}.`
       );
     }
-
-    if (
-      change.content.includes(
-        "CLOUDFLARE_API_TOKEN"
-      ) &&
-      /CLOUDFLARE_API_TOKEN\s*[:=]\s*["'`][^"'`]+/.test(
-        change.content
-      )
-    ) {
-      throw new Error(
-        `Possible Cloudflare secret in ${change.path}.`
-      );
-    }
   }
 
   const workerChange =
     plan.changes.find(
       item =>
-        item.path ===
-        WORKER_FILE
+        item.path === WORKER_FILE
     );
 
   if (workerChange) {
@@ -1367,28 +1296,12 @@ function validateRepairPlan(
 
     if (!architecture.ok) {
       throw new Error(
-        `Repaired Worker failed architecture validation: ${architecture.problems.join(" | ")}`
+        `Proposed Worker failed validation: ${architecture.problems.join(" | ")}`
       );
     }
   }
 
   return true;
-}
-
-function createBranchName() {
-  const stamp =
-    new Date()
-      .toISOString()
-      .replace(
-        /[^0-9]/g,
-        ""
-      )
-      .slice(
-        0,
-        14
-      );
-
-  return `ai-repair/${stamp}`;
 }
 
 async function createBranch(
@@ -1401,27 +1314,17 @@ async function createBranch(
       DEFAULT_BRANCH
     );
 
-  const sha =
-    main?.commit?.sha;
-
-  if (!sha) {
-    throw new Error(
-      "Main branch commit SHA unavailable."
-    );
-  }
-
   return github(
     env,
-    `/repos/${REPOSITORY}/git/refs`,
+    "/git/refs",
     {
       method: "POST",
-
-      body:
-        JSON.stringify({
-          ref:
-            `refs/heads/${branchName}`,
-          sha
-        })
+      body: JSON.stringify({
+        ref:
+          `refs/heads/${branchName}`,
+        sha:
+          main.commit.sha
+      })
     }
   );
 }
@@ -1430,48 +1333,41 @@ async function updateFile(
   env,
   path,
   content,
-  branch,
-  message
+  message,
+  branch
 ) {
-  let existing = null;
+  let existingSha = null;
 
   try {
-    existing =
+    const existing =
       await getFile(
         env,
         path,
         branch
       );
+
+    existingSha = existing.sha;
   } catch {
-    existing = null;
+    existingSha = null;
   }
 
   const body = {
     message,
-
     content:
-      base64EncodeUtf8(
-        content
-      ),
-
+      encodeBase64Utf8(content),
     branch
   };
 
-  if (
-    existing?.sha
-  ) {
-    body.sha =
-      existing.sha;
+  if (existingSha) {
+    body.sha = existingSha;
   }
 
   return github(
     env,
-    `/repos/${REPOSITORY}/contents/${path}`,
+    `/contents/${path}`,
     {
       method: "PUT",
-
-      body:
-        JSON.stringify(body)
+      body: JSON.stringify(body)
     }
   );
 }
@@ -1484,45 +1380,32 @@ async function createPullRequest(
 ) {
   return github(
     env,
-    `/repos/${REPOSITORY}/pulls`,
+    "/pulls",
     {
       method: "POST",
-
-      body:
-        JSON.stringify({
-          title,
-          head: branch,
-          base:
-            DEFAULT_BRANCH,
-          body
-        })
+      body: JSON.stringify({
+        title,
+        head: branch,
+        base: DEFAULT_BRANCH,
+        body
+      })
     }
   );
 }
 
-async function prepareRepair(
-  env
-) {
+function safeBranchName() {
+  const timestamp =
+    new Date()
+      .toISOString()
+      .replace(/[^0-9]/g, "")
+      .slice(0, 14);
+
+  return `ai-repair/${timestamp}`;
+}
+
+async function runRepair(env) {
   const inspection =
-    await inspectProject(
-      env
-    );
-
-  if (
-    inspection.ok
-  ) {
-    return {
-      ok: true,
-
-      repairRequired:
-        false,
-
-      message:
-        "Project is healthy; no repair required.",
-
-      inspection
-    };
-  }
+    await inspectProject(env);
 
   const worker =
     await getFile(
@@ -1538,28 +1421,13 @@ async function prepareRepair(
       worker.content
     );
 
-  if (
-    !plan.repairRequired
-  ) {
+  if (!plan.repairRequired) {
     return {
       ok: true,
-
-      repairRequired:
-        false,
-
+      repaired: false,
       message:
-        "AI determined that no safe repair is required.",
-
-      diagnosis:
-        plan.diagnosis || "",
-
-      validation:
-        plan.validation || [],
-
-      notes:
-        plan.notes || [],
-
-      inspection
+        "AI determined that no repair is required.",
+      plan
     };
   }
 
@@ -1568,31 +1436,27 @@ async function prepareRepair(
     worker.content
   );
 
-  if (
-    !plan.changes.length
-  ) {
-    throw new Error(
-      "AI marked repairRequired=true but returned no changes."
-    );
-  }
-
   const branchName =
-    createBranchName();
+    safeBranchName();
 
   await createBranch(
     env,
     branchName
   );
 
-  for (
-    const change of plan.changes
-  ) {
+  const updatedFiles = [];
+
+  for (const change of plan.changes) {
     await updateFile(
       env,
       change.path,
       change.content,
-      branchName,
-      `AI repair: ${change.path}`
+      `AI repair: ${change.path}`,
+      branchName
+    );
+
+    updatedFiles.push(
+      change.path
     );
   }
 
@@ -1600,103 +1464,46 @@ async function prepareRepair(
     await createPullRequest(
       env,
       branchName,
-      "AI repair: NowPulse",
+      "NowPulse AI safe repair",
       [
-        "Automated NowPulse repair.",
+        "Automated safe repair generated by NowPulse AI Manager.",
         "",
-        `Diagnosis: ${plan.diagnosis || "Not provided."}`,
+        `Manager version: ${VERSION}`,
+        "",
+        "Diagnosis:",
+        text(plan.diagnosis),
         "",
         "Validation:",
-        ...(plan.validation || []).map(
-          item => `- ${item}`
-        ),
+        ...(Array.isArray(plan.validation)
+          ? plan.validation.map(
+              item => `- ${item}`
+            )
+          : []),
         "",
-        "Notes:",
-        ...(plan.notes || []).map(
-          item => `- ${item}`
-        ),
-        "",
-        "This PR was created by the NowPulse AI Manager."
+        "Changed files:",
+        ...updatedFiles.map(
+          file => `- ${file}`
+        )
       ].join("\n")
     );
 
   return {
     ok: true,
-
-    repairRequired:
-      true,
-
-    branch:
-      branchName,
-
+    repaired: true,
+    branch: branchName,
     pullRequest: {
-      number:
-        pullRequest.number,
-
-      url:
-        pullRequest.html_url,
-
-      state:
-        pullRequest.state
+      number: pullRequest.number,
+      url: pullRequest.html_url,
+      state: pullRequest.state
     },
-
-    diagnosis:
-      plan.diagnosis || "",
-
-    validation:
-      plan.validation || [],
-
-    notes:
-      plan.notes || [],
-
-    inspection
+    diagnosis: plan.diagnosis,
+    changedFiles: updatedFiles
   };
 }
 
-function health(env) {
-  return {
-    ok: true,
-
-    service:
-      "NowPulse AI Manager",
-
-    version:
-      VERSION,
-
-    mode:
-      env.NOWPULSE_AI_REPAIR_MODE ||
-      "safe",
-
-    ai:
-      Boolean(env.AI),
-
-    github:
-      Boolean(env.GITHUB_TOKEN),
-
-    repository:
-      env.NOWPULSE_GITHUB_REPO ||
-      REPOSITORY,
-
-    branch:
-      env.NOWPULSE_GITHUB_BRANCH ||
-      DEFAULT_BRANCH,
-
-    workerFile:
-      env.NOWPULSE_WORKER_FILE ||
-      WORKER_FILE,
-
-    timestamp:
-      new Date().toISOString()
-  };
-}
-
-async function githubDiagnostic(
-  env
-) {
+async function githubTest(env) {
   const tokenPresent =
-    Boolean(
-      env.GITHUB_TOKEN
-    );
+    Boolean(env.GITHUB_TOKEN);
 
   if (!tokenPresent) {
     return {
@@ -1707,109 +1514,90 @@ async function githubDiagnostic(
     };
   }
 
-  const user =
-    await githubRaw(
-      env,
-      "/user"
+  const userResponse =
+    await fetch(
+      "https://api.github.com/user",
+      {
+        headers:
+          githubHeaders(env)
+      }
     );
+
+  const userBody =
+    await userResponse.text();
+
+  let userData;
+
+  try {
+    userData =
+      JSON.parse(userBody);
+  } catch {
+    userData = {};
+  }
 
   const repository =
     await githubRaw(
       env,
-      `/repos/${REPOSITORY}`
+      ""
     );
 
   const branch =
     await githubRaw(
       env,
-      `/repos/${REPOSITORY}/branches/${DEFAULT_BRANCH}`
+      `/branches/${DEFAULT_BRANCH}`
     );
 
   return {
     ok:
-      user.ok &&
+      userResponse.ok &&
       repository.ok &&
       branch.ok,
 
     tokenPresent: true,
 
     githubUser: {
-      ok:
-        user.ok,
-
-      status:
-        user.status,
-
+      ok: userResponse.ok,
+      status: userResponse.status,
       login:
-        user.data?.login ||
-        null,
-
+        userData?.login || null,
       type:
-        user.data?.type ||
-        null,
-
+        userData?.type || null,
       message:
-        user.data?.message ||
-        null,
-
+        userData?.message || null,
       documentation:
-        user.headers
-          .documentation ||
-        ""
+        userData?.documentation_url || ""
     },
 
     repository: {
-      ok:
-        repository.ok,
-
-      status:
-        repository.status,
-
+      ok: repository.ok,
+      status: repository.status,
       fullName:
-        repository.data?.full_name ||
-        null,
-
+        repository.data?.full_name || null,
       private:
-        repository.data?.private ??
-        null,
-
+        repository.data?.private ?? null,
       permissions:
-        repository.data?.permissions ||
-        null,
-
+        repository.data?.permissions || null,
       message:
         repository.data?.message ||
+        repository.error ||
         null,
-
       documentation:
-        repository.headers
-          .documentation ||
-        ""
+        repository.data?.documentation_url || ""
     },
 
     branch: {
-      ok:
-        branch.ok,
-
-      status:
-        branch.status,
-
+      ok: branch.ok,
+      status: branch.status,
       name:
-        branch.data?.name ||
-        null,
-
+        branch.data?.name || null,
       protected:
-        branch.data?.protected ??
-        null,
-
+        branch.data?.protected ?? null,
       message:
         branch.data?.message ||
+        branch.error ||
         null,
-
       documentation:
-        branch.headers
-          .documentation ||
-        ""
+        branch.data?.documentation_url || ""
     },
 
     timestamp:
@@ -1817,173 +1605,195 @@ async function githubDiagnostic(
   };
 }
 
+async function health(env) {
+  return {
+    ok: true,
+    service:
+      "NowPulse AI Manager",
+    version: VERSION,
+    mode:
+      env.NOWPULSE_AI_REPAIR_MODE ||
+      "safe",
+    ai:
+      Boolean(env.AI),
+    github:
+      Boolean(env.GITHUB_TOKEN),
+    repository: REPOSITORY,
+    branch: DEFAULT_BRANCH,
+    workerFile: WORKER_FILE,
+    timestamp:
+      new Date().toISOString()
+  };
+}
+
+async function handleRepair(env) {
+  try {
+    const result =
+      await runRepair(env);
+
+    return json(
+      result,
+      result.ok ? 200 : 500
+    );
+  } catch (error) {
+    return json(
+      {
+        ok: false,
+        error:
+          text(error?.message || error),
+        version: VERSION,
+        timestamp:
+          new Date().toISOString()
+      },
+      500
+    );
+  }
+}
+
+async function handleInspect(env) {
+  try {
+    const result =
+      await inspectProject(env);
+
+    return json(
+      result,
+      result.ok ? 200 : 500
+    );
+  } catch (error) {
+    return json(
+      {
+        ok: false,
+        error:
+          text(error?.message || error),
+        version: VERSION,
+        timestamp:
+          new Date().toISOString()
+      },
+      500
+    );
+  }
+}
+
 export default {
-  async fetch(
-    request,
-    env
-  ) {
+  async fetch(request, env) {
     const url =
-      new URL(
-        request.url
-      );
+      new URL(request.url);
 
-    try {
-      if (
-        url.pathname === "/"
-      ) {
-        return json({
-          ok: true,
+    const pathname =
+      url.pathname.replace(
+        /\/+$/,
+        ""
+      ) || "/";
 
-          service:
-            "NowPulse AI Manager",
-
-          version:
-            VERSION,
-
-          endpoints: [
-            "/health",
-            "/github-test",
-            "/inspect",
-            "/repair"
-          ]
-        });
-      }
-
-      if (
-        url.pathname ===
-        "/health"
-      ) {
-        return json(
-          health(env)
-        );
-      }
-
-      if (
-        url.pathname ===
-        "/github-test"
-      ) {
-        const result =
-          await githubDiagnostic(
-            env
-          );
-
-        return json(
-          result,
-          result.ok
-            ? 200
-            : 502
-        );
-      }
-
-      if (
-        url.pathname ===
-        "/inspect"
-      ) {
-        const result =
-          await inspectProject(
-            env
-          );
-
-        return json(
-          result,
-          result.ok
-            ? 200
-            : 409
-        );
-      }
-
-      if (
-        url.pathname ===
-        "/repair"
-      ) {
-        if (
-          request.method !==
-            "GET" &&
-          request.method !==
-            "POST"
-        ) {
-          return json(
-            {
-              ok: false,
-              error:
-                "Use GET or POST."
-            },
-            405
-          );
-        }
-
-        const result =
-          await prepareRepair(
-            env
-          );
-
-        return json(
-          result
-        );
-      }
-
+    if (
+      request.method !== "GET" &&
+      request.method !== "POST"
+    ) {
       return json(
         {
           ok: false,
           error:
-            "Not found."
+            "Method not allowed."
         },
-        404
-      );
-    } catch (error) {
-      return json(
-        {
-          ok: false,
-
-          error:
-            error?.message ||
-            String(error),
-
-          service:
-            "NowPulse AI Manager",
-
-          version:
-            VERSION
-        },
-        500
+        405
       );
     }
+
+    if (pathname === "/") {
+      return json({
+        ok: true,
+        service:
+          "NowPulse AI Manager",
+        version: VERSION,
+        repository: REPOSITORY,
+        endpoints: [
+          "/health",
+          "/github-test",
+          "/inspect",
+          "/repair"
+        ]
+      });
+    }
+
+    if (pathname === "/health") {
+      return json(
+        await health(env)
+      );
+    }
+
+    if (pathname === "/github-test") {
+      try {
+        return json(
+          await githubTest(env)
+        );
+      } catch (error) {
+        return json(
+          {
+            ok: false,
+            error:
+              text(error?.message || error),
+            version: VERSION
+          },
+          500
+        );
+      }
+    }
+
+    if (pathname === "/inspect") {
+      return handleInspect(env);
+    }
+
+    if (pathname === "/repair") {
+      if (
+        env.NOWPULSE_AI_REPAIR_MODE ===
+        "disabled"
+      ) {
+        return json(
+          {
+            ok: false,
+            error:
+              "AI repair is disabled."
+          },
+          403
+        );
+      }
+
+      return handleRepair(env);
+    }
+
+    return json(
+      {
+        ok: false,
+        error: "Not found."
+      },
+      404
+    );
   },
 
-  async scheduled(
-    event,
-    env,
-    ctx
-  ) {
+  async scheduled(event, env, ctx) {
     if (
-      (
-        env.NOWPULSE_AI_REPAIR_MODE ||
-        "safe"
-      ) !== "safe"
+      env.NOWPULSE_AI_REPAIR_MODE !==
+      "safe"
     ) {
       return;
     }
 
-    ctx.waitUntil(
-      (async () => {
-        try {
-          const inspection =
-            await inspectProject(
-              env
-            );
-
-          if (
-            !inspection.ok
-          ) {
-            await prepareRepair(
-              env
-            );
-          }
-        } catch {
-          // Scheduled self-healing
-          // must never break the Worker.
-        }
-      })()
-    );
+    /*
+     * Safe mode performs inspection only.
+     *
+     * It does NOT automatically create a branch,
+     * commit or pull request from the scheduled job.
+     *
+     * This prevents an incorrect inspection from
+     * modifying production code automatically.
+     */
+    try {
+      await inspectProject(env);
+    } catch {
+      /*
+       * Scheduled inspection must never crash
+       * the Worker because of a diagnostic failure.
+       */
+    }
   }
 };
