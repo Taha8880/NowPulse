@@ -46,7 +46,7 @@ jobs:
       - name: Validate product contract
         run: |
           set -euo pipefail
-          grep -q 'const VERSION = "6.1.3"' src/worker.js
+          grep -q 'const VERSION = "6.1.5"' src/worker.js
           grep -q 'img:v11:' src/worker.js
           grep -q 'wikipediaImage' src/worker.js
           grep -q 'getAgentByName' src/worker.js
@@ -60,7 +60,7 @@ jobs:
           grep -q 'provider.fx' src/worker.js
           grep -q 'sourceEvidence' src/worker.js
           grep -q 'PRIMARY SOURCE EVIDENCE' src/worker.js
-          grep -q 'story-hub' src/worker.js
+          grep -q 'article-kicker' src/worker.js
           grep -q 'Created by Taha' src/worker.js
           grep -q 'google.com, pub-1235197294708204' src/worker.js
           grep -q '@cf/zai-org/glm-5.2' ai-manager.js
