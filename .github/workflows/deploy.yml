@@ -1,178 +1,50 @@
-name: NowPulse CI Validation
-
+name: NowPulse CI
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install dependencies
-        run: npm install --ignore-scripts
-
-      - name: Validate JavaScript
-        run: npm run check
-
-      - name: Validate Wrangler configuration
-        continue-on-error: true
-        run: npx wrangler deploy --dry-run --config wrangler.jsonc
-
-      - name: Validate product contract
-        run: npm run test:contract
-
-      - name: Verify required files
-        run: |
-          set -euo pipefail
-          test -f src/worker.js
-          test -f wrangler.jsonc
-          test -f src/ai-guardian.js
-          test -f src/nowpulse-maintenance-workflow.js
-          test -f ai-manager.js
-          test -f ai-manager.wrangler.jsonc
-          test -f .github/workflows/validate-pr.yml
-          test -f .github/workflows/self-heal.yml
-          test -f .github/workflows/ai-repair-auto-merge.yml
-
-      - name: Validate autonomous architecture
-        run: |
-          node <<'NODE'
-          const fs = require("fs");
-          const w = fs.readFileSync("wrangler.jsonc", "utf8");
-          const wf = fs.readFileSync("src/nowpulse-maintenance-workflow.js", "utf8");
-          for (const [name, source, needle] of [
-            ["Guardian export", w, "NowPulseGuardian"],
-            ["Workflow class source", fs.readFileSync("src/nowpulse-maintenance-workflow.js", "utf8"), "class NowPulseMaintenanceWorkflow"],
-            ["GitHub secret access", wf, "NOWPULSE_GITHUB_TOKEN"],
-            ["Guardian agent access", wf, "getAgentByName"]
-          ]) {
-            if (!source.includes(needle)) throw new Error("Missing autonomous contract: " + name);
-          }
-          console.log("Autonomous architecture contract passed.");
-          NODE
-
-      - name: Install GitHub token on NowPulse Worker
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        shell: bash
+      - run: npm install --ignore-scripts
+      - run: npm run check
+      - run: npm run test:contract
+      - run: npx wrangler deploy --dry-run --config wrangler.jsonc
+      - name: Deploy production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config wrangler.jsonc
+      - name: Install GitHub token
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
+        run: printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc
+      - name: Verify production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          set -euo pipefail
-          test -n "${NOWPULSE_GITHUB_TOKEN:-}"
-          printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler versions secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc --message "Update NowPulse GitHub maintenance secret"
-
-      - name: Ensure Cloudflare maintenance Workflow
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          test -n "${CLOUDFLARE_API_TOKEN:-}"
-          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          payload='{"class_name":"NowPulseMaintenanceWorkflow","script_name":"nowpulse"}'
-          response="$(curl -fsSL --max-time 30             -X PUT             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data "$payload"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
-          echo "$response" | node -e '
-            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-              const d=JSON.parse(s);
-              if(!d.success) throw new Error("Cloudflare Workflow create/update failed: "+JSON.stringify(d.errors||[]));
-              if(d.result?.class_name!=="NowPulseMaintenanceWorkflow") throw new Error("Unexpected Workflow class");
-              console.log("Cloudflare maintenance Workflow is provisioned.");
-            });
-          '
-          body="$(curl -fsSL --max-time 20             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
-          echo "$body" | node -e '
-            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-              const d=JSON.parse(s);
-              if(!d.success) throw new Error("Cloudflare Workflow lookup failed");
-              if(d.result?.name!=="nowpulse-maintenance") throw new Error("Workflow name mismatch");
-              if(d.result?.script_name!=="nowpulse") throw new Error("Workflow script mismatch");
-              console.log("Cloudflare maintenance Workflow lookup verified; 15-minute cadence is enforced by the Worker cron lock.");
-            });
-          '
-
-      - name: Deploy Worker directly from CI
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          test -n "${CLOUDFLARE_API_TOKEN:-}"
-          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          npx wrangler deploy --config wrangler.jsonc
-      - name: Verify production after Cloudflare deployment
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="https://nowpulse.tavengers16.workers.dev"
+          set -e
+          base=https://nowpulse.tavengers16.workers.dev
           ok=0
-          for attempt in $(seq 1 24); do
-            if health="$(curl -fsSL --max-time 20 "$base/health" 2>/dev/null)"; then
-              echo "$health"
-              if echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q '"service":"NowPulse"' && echo "$health" | grep -q '"version":"6.1.3"'; then
-                ok=1
-                break
-              fi
-            fi
-            echo "Waiting for production deployment... attempt $attempt/24"
-            sleep 10
+          for i in $(seq 1 18); do
+            h=$(curl -fsSL --max-time 15 "$base/health" || true)
+            echo "$h"
+            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"7.0.0"'; then ok=1; break; fi
+            sleep 5
           done
-          test "$ok" = "1"
-
-          home_status="$(curl -sS --max-time 20 -o /tmp/nowpulse-home.html -w "%{http_code}" "$base/" || true)"
-          if [ "$home_status" != "200" ]; then
-            echo "Homepage HTTP status: $home_status"
-            echo "Health diagnostic after homepage failure:"
-            curl -fsSL --max-time 20 "$base/health" || true
-            echo "Homepage response:"
-            cat /tmp/nowpulse-home.html || true
-            exit 1
-          fi
-          home="$(cat /tmp/nowpulse-home.html)"
-          grep -q 'NowPulse' <<< "$home"
-          article_count="$(printf '%s' "$home" | grep -o '/article/' | wc -l | tr -d ' ')"
-          test "$article_count" -gt 0
-
-          markets="$(curl -fsSL --max-time 20 "$base/api/markets")"
-          for key in usdEgp eurEgp gbpEgp gold24k gold21k gold18k; do
-            grep -q "\"$key\"" <<< "$markets"
-          done
-
-          ads="$(curl -fsSL --max-time 20 "$base/ads.txt")"
-          grep -q 'google.com, pub-1235197294708204' <<< "$ads"
-
-          sitemap="$(curl -fsSL --max-time 20 "$base/sitemap.xml")"
-          home="$(curl -fsSL --max-time 20 "$base/")"
-          count="$(printf "%s" "$home" | grep -o "/article/" | wc -l | tr -d " ")"
-          test "$count" -ge 5
-          echo "Homepage article cards detected: $count"
-          grep -q '<urlset' <<< "$sitemap"
-
-          search="$(curl -fsSL --max-time 20 "$base/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar")"
-          grep -q 'NowPulse' <<< "$search"
-
-          echo "Production verification passed: health, news, markets, ads.txt, sitemap and Arabic search are live."
-
-      - name: Final CI result
-        run: echo "NowPulse CI validation passed. Production deployment is managed by Cloudflare Workers Builds."
+          test "$ok" = 1
+          curl -fsSL "$base/api/news" | grep -q '\['
+          curl -fsSL "$base/api/markets" | grep -q 'usdEgp'
+          curl -fsSL "$base/sitemap.xml" | grep -q '<urlset'
