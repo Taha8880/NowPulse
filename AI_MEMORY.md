@@ -83,3 +83,6 @@ The AI is expected to inspect the complete product on schedule without waiting f
 - AI Manager uses GLM-5.2 as primary reasoning with Llama fallback.
 - Product contract tests must run in CI and protect news, images, markets, article evidence, Story Hub, SEO and AdSense requirements.
 - No dead TimeShift UI is required; future story-evolution features must be implemented only when they have a complete user-facing flow and reliable evidence.
+
+## Audit checkpoint
+- Current release contract is 6.1.2; validation covers search, weather, markets and semantic images.
