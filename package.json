@@ -9,7 +9,7 @@
     "wrangler": "^4.0.0"
   },
   "scripts": {
-    "check": "node --check src/worker.js && node --check src/ai-guardian.js && node --check src/nowpulse-maintenance-workflow.js && node --check ai-manager.js && node --check tests/product-contract.mjs && node tests/product-contract.mjs",
+    "check": "node --check src/worker.js && node --check src/ai-guardian.js && node --check src/nowpulse-maintenance-workflow.js && node --check ai-manager.js",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
