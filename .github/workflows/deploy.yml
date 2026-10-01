@@ -1,9 +1,6 @@
-name: NowPulse Deploy
+name: NowPulse Manual Deploy
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
