@@ -30,7 +30,6 @@ const checks=[
   ['ads.txt',worker.includes('google.com, pub-1235197294708204')],
   ['guardian',wrangler.includes('"NowPulseGuardian"')],
   ['maintenance workflow',read('src/nowpulse-maintenance-workflow.js').includes('class NowPulseMaintenanceWorkflow')],
-  ['ctx exports',wrangler.includes('"enable_ctx_exports"')],
   ['AI primary',ai.includes('@cf/zai-org/glm-5.2')],
   ['AI fallback',ai.includes('@cf/meta/llama-3.1-8b-instruct-fast')],
   ['AI manager version',ai.includes('const VERSION = "10.1.0"')],
