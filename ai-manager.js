@@ -1177,6 +1177,10 @@ Rules:
 - Do not rewrite the entire Worker unless genuinely necessary.
 - Prefer safe complete-file repairs.
 - Never include GITHUB_TOKEN.
+- Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, malformed text, or runtime errors as real defects requiring repair.
+- If the live site has no news, repair the ingestion/fallback path so the homepage can recover news without waiting for a user action.
+- Search must return relevant results from both local cached news and a reliable external fallback when local news is empty.
+- Image failures must never prevent news cards from rendering; use relevant semantic fallbacks or omit the image.
 - Worker must remain Cloudflare Worker compatible.
 
 Current Worker source:
