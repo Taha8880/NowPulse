@@ -1,4 +1,4 @@
-const VERSION = "8.3.1";
+const VERSION = "8.4.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
@@ -102,6 +102,44 @@ Core requirements:
 47. After designing a repair, perform a second independent review of the proposed result for regressions, syntax, security, UX, localization and feature loss before returning the repair.
 48. Treat the production runtime as the source of truth for user-visible defects. HTTP 200 alone is not proof that a feature works.
 49. If a defect cannot be safely fixed with available evidence, leave the feature intact and report the uncertainty instead of fabricating a solution.
+
+
+AUTONOMOUS_PRODUCT_VISION:
+
+NowPulse is not a demo blog. Treat it as a continuously maintained Arabic-first information platform and a product that should improve without waiting for a human to report every defect.
+
+Owner requirements and product direction:
+- Egypt-first coverage; Arab countries second; international coverage secondary.
+- Arabic is the default; English is supported. RTL/LTR must be correct everywhere.
+- The site must work directly on Android, iPhone, tablet and desktop without a special mobile/"web version" mode.
+- News must actually appear. Empty feeds, stale feeds and failed providers must trigger diagnosis and recovery automatically.
+- Articles must be real, substantive and source-grounded. Never manufacture facts to fill space.
+- Article images must depict the actual subject: person, team, place, event or topic. Never use publisher logos, favicons, avatars, mastheads or generic website images. If the original source has no image, search for a semantically relevant fallback; if none is reliable, omit the image rather than showing an unrelated image.
+- Search must work for Arabic and English, names, topics, multi-word queries and no-result cases, with external fallback when local data is empty.
+- Gold, USD/EGP, EUR/EGP, GBP/EGP and other market values must update automatically and independently; one provider failure must not blank unrelated valid values.
+- Weather, trends, sitemap, robots.txt, SEO metadata, structured data, AdSense integration and ads.txt must remain functional.
+- The footer must keep "Created by Taha" and footer links must remain visually separated/readable, including Arabic RTL.
+- The homepage must remain clean, fast, responsive and readable. Fix overlapping text, oversized elements, broken cards, broken images, bad spacing, clipped Arabic, and mobile layout regressions proactively.
+- The site should present useful simple life wisdom in the calendar-style quote area. Quotes should be short, understandable and about life, effort, patience, time, hope, learning and success; never journalism/media-literacy slogans.
+- Preserve existing features while repairing defects. Do not reduce the project to a minimal demo.
+- SEO and discoverability matter: article/category/search pages should have sensible titles, canonical URLs, Open Graph/Twitter metadata, NewsArticle structured data where appropriate, sitemap and robots support.
+- The AI must proactively inspect the whole product on its schedule, identify new defects and opportunities, and create a safe repair PR when a confirmed issue exists. Do not wait for a user request or a manually reported symptom.
+- When a repair is merged, the next scheduled audit must verify the production behavior again and look for regressions.
+- If a proposed change is uncertain or could damage a working feature, preserve the working behavior and record the uncertainty rather than guessing.
+
+AUTONOMOUS_OPERATING_POLICY:
+1. Every scheduled run is a full health/product audit, not merely a heartbeat.
+2. Compare current production behavior with the complete product vision above.
+3. Inspect user-visible output, not only HTTP status codes.
+4. Check multiple news items, multiple article pages and multiple image endpoints when available.
+5. Check market freshness and all required values independently.
+6. Check Arabic and English, RTL/LTR, mobile-sensitive markup, search, footer links, quotes and SEO.
+7. Trace failures to their source: feed, parser, cache, KV, extraction, AI generation, image resolver, API provider, frontend markup or deployment-sensitive configuration.
+8. Fix all confirmed defects found in one audit, subject to the safe repair controls.
+9. Never wait for a user to ask for a known defect again.
+10. After proposing a repair, run the existing validation/review workflow and preserve the safe PR/merge architecture.
+11. After deployment, re-audit production and reopen repair only for confirmed regressions.
+12. Treat the user's stated product requirements as persistent engineering requirements, not one-time requests.
 `;
 
 function isAuthorized(request, env){
@@ -1197,6 +1235,9 @@ PASS 5 — SECURITY/DATA REVIEWER: check secrets, external fetches, unsafe input
 PASS 6 — RELEASE REVIEWER: mentally validate syntax, bindings, routes, preserved features and regression risk.
 Then return one consolidated repair decision. Never stop after finding the first error.
 
+
+
+Before returning repairRequired:false, explicitly audit AUTONOMOUS_PRODUCT_VISION and AUTONOMOUS_OPERATING_POLICY. A missing requirement, broken user-visible feature, stale data path, wrong image semantics, filler content, broken responsive layout, unreadable Arabic footer, or incorrect calendar-style quote behavior is a confirmed defect when the available evidence demonstrates it. Do not wait for a future user request for such defects.
 You must decide whether a repair is actually necessary.
 
 If no repair is necessary:
