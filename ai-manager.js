@@ -1,4 +1,4 @@
-const VERSION = "8.1.0";
+const VERSION = "8.2.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
@@ -83,6 +83,13 @@ Core requirements:
 29. Only modify the NowPulse repository.
 30. Political/news content must remain factual and neutral.
 `;
+
+function isAuthorized(request, env){
+  const configured=env.AI_MANAGER_AUTH_TOKEN||env.GITHUB_TOKEN||"";
+  if(!configured)return false;
+  const header=request.headers.get("authorization")||"";
+  return header===`Bearer ${configured}`;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -1372,6 +1379,13 @@ async function updateFile(
   );
 }
 
+async function hasOpenRepairPR(env){
+  try{
+    const prs=await github(env, "/pulls?state=open&base="+encodeURIComponent(DEFAULT_BRANCH)+"&per_page=20");
+    return Array.isArray(prs)&&prs.some(p=>String(p.title||"").includes("NowPulse AI safe repair"));
+  }catch{return false;}
+}
+
 async function createPullRequest(
   env,
   branch,
@@ -1435,6 +1449,10 @@ async function runRepair(env) {
     plan,
     worker.content
   );
+
+  if(await hasOpenRepairPR(env)){
+    return {ok:true,repaired:false,message:"An AI repair pull request is already open."};
+  }
 
   const branchName =
     safeBranchName();
@@ -1722,6 +1740,7 @@ export default {
     }
 
     if (pathname === "/github-test") {
+      if (!isAuthorized(request, env)) return json({ok:false,error:"Unauthorized."},401);
       try {
         return json(
           await githubTest(env)
@@ -1740,10 +1759,12 @@ export default {
     }
 
     if (pathname === "/inspect") {
+      if (!isAuthorized(request, env)) return json({ok:false,error:"Unauthorized."},401);
       return handleInspect(env);
     }
 
     if (pathname === "/repair") {
+      if (!isAuthorized(request, env)) return json({ok:false,error:"Unauthorized."},401);
       if (
         env.NOWPULSE_AI_REPAIR_MODE ===
         "disabled"
