@@ -18,7 +18,7 @@ jobs:
           code=$(curl -L -s -o /tmp/home -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/)
           test "$code" = "200"
           grep -q 'NowPulse' /tmp/home
-          grep -q '6.1.1' /tmp/home
+          grep -q '6.1.2' /tmp/home
           grep -q '/article/' /tmp/home
 
       - name: Check health
@@ -33,9 +33,27 @@ jobs:
           code=$(curl -L -s -o /tmp/markets -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/api/markets)
           test "$code" = "200"
           grep -q 'usdEgp' /tmp/markets
+          grep -q 'eurEgp' /tmp/markets
+          grep -q 'gbpEgp' /tmp/markets
+          grep -q 'chfEgp' /tmp/markets
           grep -q 'gold21k' /tmp/markets
           grep -q 'gold24k' /tmp/markets
           grep -q 'gold18k' /tmp/markets
+
+      - name: Check weather
+        run: |
+          set -e
+          code=$(curl -L -s -o /tmp/weather -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/weather?city=cairo')
+          test "$code" = "200"
+          grep -q 'temperature' /tmp/weather
+          grep -q 'humidity' /tmp/weather
+
+      - name: Check image endpoint
+        run: |
+          set -e
+          code=$(curl -L -s -o /tmp/image -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/image?id=NowPulse-test-image')
+          test "$code" = "200"
+          grep -q 'image/' <(curl -L -s -D - -o /dev/null --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/image?id=NowPulse-test-image')
 
       - name: Check ads.txt
         run: |
