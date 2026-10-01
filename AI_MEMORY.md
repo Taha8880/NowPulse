@@ -62,18 +62,21 @@ The AI is expected to inspect the complete product on schedule without waiting f
 
 ## Engineering history
 - Article cache was upgraded to article:v2 and source evidence extraction was added.
+- Image resolver cache was explicitly rotated to img:v5 after the semantic resolver rebuild so stale img:v4 values cannot keep publisher branding visible.
 - Semantic image selection uses article image/source HTML/GDELT/Wikipedia/Wikimedia fallbacks while rejecting logos/icons/avatars/placeholders/branding.
 - Markets use independent providers and stale-value isolation.
 - Search normalizes Arabic variants and supports Arabic/English.
 - Quotes were changed from journalism-themed phrases to simple life wisdom.
 - Professional inline SVG NowPulse branding and responsive design were added.
-- AI Manager reached 9.x and uses persistent KV maintenance memory.
+- AI Manager is 10.1.x and uses persistent KV maintenance memory.
 - Durable Agent + Workflow control plane is part of the v6.0.0 architecture.
 - GitHub validation now includes dependency installation, JavaScript syntax, Wrangler dry-run and production smoke tests.
 - The current objective is a continuously improving production platform, not a one-time bug fix.
+- Maintenance cadence is 15 minutes for the AI Manager; the production Worker remains on its own ingestion schedule.
+- Final release verification must rely on CI production smoke tests because direct browser fetching of the Worker endpoint is not available through every inspection channel.
 
 ## Current product architecture target
-- v6.0.0 is a cohesive product release, not a collection of symptom patches.
+- v6.1.0 is the current cohesive product release, not a collection of symptom patches.
 - Homepage rendering must stay fast: article images resolve through the semantic image endpoint instead of bulk-blocking page generation.
 - Image selection is source-first and semantic, with GDELT/Wikipedia/Wikimedia fallbacks and an explicit blacklist for publisher branding.
 - Market data uses independent live FX and gold providers with per-provider status and isolated cached fallback.
