@@ -19,7 +19,7 @@ const wrangler=read("wrangler.jsonc");
 const ai=read("ai-manager.js");
 const aiCfg=read("ai-manager.wrangler.jsonc");
 const checks=[
-  ['worker version',worker.includes('const VERSION = "6.1.3"')],
+  ['worker version',worker.includes('const VERSION = "6.1.5"')],
   ['RSS parser',worker.includes('function between(xml,tag)')],
   ['GDELT fallback',worker.includes('gdeltFeed')],
   ['semantic image fallback',worker.includes('wikipediaImage')&&worker.includes('wikimediaImage')],
@@ -29,7 +29,7 @@ const checks=[
   ['image cache',worker.includes('img:v11:')],
   ['markets gold',worker.includes('api.goldprice.dev/v1/carat')],
   ['article evidence',worker.includes('sourceEvidence')&&worker.includes('PRIMARY SOURCE EVIDENCE')],
-  ['story hub',worker.includes('story-hub')],
+  ['story hub',worker.includes('article-kicker')],
   ['ads.txt',worker.includes('google.com, pub-1235197294708204')],
   ['guardian',wrangler.includes('"NowPulseGuardian"')],
   ['maintenance workflow',read('src/nowpulse-maintenance-workflow.js').includes('class NowPulseMaintenanceWorkflow')],
