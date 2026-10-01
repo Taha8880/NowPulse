@@ -167,6 +167,10 @@ jobs:
           grep -q 'google.com, pub-1235197294708204' <<< "$ads"
 
           sitemap="$(curl -fsSL --max-time 20 "$base/sitemap.xml")"
+          home="$(curl -fsSL --max-time 20 "$base/")"
+          count="$(printf "%s" "$home" | grep -o "/article/" | wc -l | tr -d " ")"
+          test "$count" -ge 5
+          echo "Homepage article cards detected: $count"
           grep -q '<urlset' <<< "$sitemap"
 
           search="$(curl -fsSL --max-time 20 "$base/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar")"
