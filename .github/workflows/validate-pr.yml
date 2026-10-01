@@ -46,8 +46,8 @@ jobs:
       - name: Validate product contract
         run: |
           set -euo pipefail
-          grep -q 'const VERSION = "6.1.2"' src/worker.js
-          grep -q 'img:v10:' src/worker.js
+          grep -q 'const VERSION = "6.1.3"' src/worker.js
+          grep -q 'img:v11:' src/worker.js
           grep -q 'wikipediaImage' src/worker.js
           grep -q 'getAgentByName' src/worker.js
           grep -q 'gdeltImage' src/worker.js
@@ -55,7 +55,7 @@ jobs:
           grep -q 'api.goldprice.dev/v1/carat' src/worker.js
           grep -q 'search:v11:' src/worker.js
           grep -q 'weather:v2:' src/worker.js
-          grep -q 'img:v10:' src/worker.js
+          grep -q 'img:v11:' src/worker.js
           grep -q 'chfEgp' src/worker.js
           grep -q 'provider.fx' src/worker.js
           grep -q 'sourceEvidence' src/worker.js
