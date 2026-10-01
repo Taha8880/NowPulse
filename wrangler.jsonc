@@ -27,11 +27,12 @@
   "upload_source_maps": true,
   "vars": {
     "NOWPULSE_ENV": "production",
-    "NOWPULSE_VERSION": "5.1.0",
+    "NOWPULSE_VERSION": "5.2.0",
     "NOWPULSE_AI_REPAIR": "enabled",
     "NOWPULSE_AI_REPAIR_MODE": "safe",
     "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
     "NOWPULSE_GITHUB_BRANCH": "main",
-    "NOWPULSE_WORKER_FILE": "src/worker.js"
+    "NOWPULSE_WORKER_FILE": "src/worker.js",
+    "ADSENSE_PUBLISHER_ID": "ca-pub-1235197294708204"
   }
 }
