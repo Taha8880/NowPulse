@@ -1118,8 +1118,43 @@ function cleanAIJson(value) {
   return result.trim();
 }
 
-async function runtimeInspection(){const paths=["/health","/?lang=ar","/?lang=en","/search?q=Egypt&lang=en","/search?q=مصر&lang=ar","/api/markets","/sitemap.xml","/ads.txt"];const checks=[];const imagePaths=new Set();for(const path of paths){try{const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"});const body=await r.text();for(const m of body.matchAll(/\/api\/image\?id=([^"'&]+)/gi)){if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));}checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']|dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body)});}catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}}for(const imagePath of imagePaths){try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\//i.test(r.headers.get("content-type")||"")});}catch(e){checks.push({path:imagePath,status:0,ok:false,error:text(e?.message||e)});}}let markets={ok:false};try{const r=await fetch(PRODUCTION_URL+"/api/markets",{cache:"no-store"});const data=await r.json();markets={ok:r.ok,status:r.status,usdEgp:Number(data.usdEgp||0),eurEgp:Number(data.eurEgp||0),gbpEgp:Number(data.gbpEgp||0),gold24k:Number(data.gold24k||0),gold21k:Number(data.gold21k||0),gold18k:Number(data.gold18k||0),updated:data.updated||null};}catch(e){markets={ok:false,error:text(e?.message||e)}}const home=checks.find(x=>x.path==="/?lang=ar");const arSearch=checks.find(x=>x.path==="/search?q=مصر&lang=ar");const enSearch=checks.find(x=>x.path==="/search?q=Egypt&lang=en");const imageChecks=checks.filter(x=>String(x.path).startsWith("/api/image?"));const brokenImages=imageChecks.filter(x=>!x.ok||!x.imageOk).length;const marketProblem=!markets.ok||markets.usdEgp<=0||markets.eurEgp<=0||markets.gbpEgp<=0||markets.gold24k<=0||markets.gold21k<=0||markets.gold18k<=0;return{ok:checks.filter(x=>!String(x.path).startsWith("/api/image?")).every(x=>x.ok)&&brokenImages===0&&!marketProblem,production:PRODUCTION_URL,checks,markets,diagnostics:{newsProblem:Boolean(home?.hasNoNews||home?.size<3000||home?.malformedText),searchProblem:Boolean(arSearch?.hasNoNews||enSearch?.hasNoNews),imageProblem:brokenImages>0||Boolean(home&&!home.hasCardImages),marketProblem,layoutProblem:Boolean(home&&!home.hasCards),brokenImages}};}
-
+async function runtimeInspection(){
+  const paths=["/health","/?lang=ar","/?lang=en","/search?q=Egypt&lang=en","/search?q=مصر&lang=ar","/api/markets","/sitemap.xml","/ads.txt"];
+  const checks=[]; const imagePaths=new Set();
+  for(const path of paths){
+    try{
+      const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"}); const body=await r.text();
+      for(const m of body.matchAll(/\\/api\\/image\\?id=([^"'&]+)/gi))if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
+      checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
+    }catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}
+  }
+  for(const imagePath of imagePaths){
+    try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\//i.test(r.headers.get("content-type")||"")});}
+    catch(e){checks.push({path:imagePath,status:0,ok:false,error:text(e?.message||e)});}
+  }
+  const home=checks.find(x=>x.path==="/?lang=ar");
+  const articleLinks=[];
+  if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\\/article\\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
+  const articleChecks=[];
+  for(const path of articleLinks){
+    try{
+      const r=await fetch(PRODUCTION_URL+(path.startsWith("/")?path:"/"+path),{redirect:"follow"});
+      const body=await r.text();
+      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+      articleChecks.push({path,status:r.status,ok:r.ok,hasArticleText:Boolean(m),length:plain.length,filler:/لا توجد معلومات متاحة|No information is available|تعذر استخراج نص المصدر|تتوفر المعلومات الحالية من المصدر المرتبط|سيعاد بناء المادة/i.test(plain)});
+    }catch(e){articleChecks.push({path,status:0,ok:false,error:text(e?.message||e)});}
+  }
+  let markets={ok:false};
+  try{const r=await fetch(PRODUCTION_URL+"/api/markets",{cache:"no-store"});const data=await r.json();markets={ok:r.ok,status:r.status,usdEgp:Number(data.usdEgp||0),eurEgp:Number(data.eurEgp||0),gbpEgp:Number(data.gbpEgp||0),gold24k:Number(data.gold24k||0),gold21k:Number(data.gold21k||0),gold18k:Number(data.gold18k||0),updated:data.updated||null};}
+  catch(e){markets={ok:false,error:text(e?.message||e)}}
+  const arSearch=checks.find(x=>x.path==="/search?q=مصر&lang=ar"),enSearch=checks.find(x=>x.path==="/search?q=Egypt&lang=en");
+  const imageChecks=checks.filter(x=>String(x.path).startsWith("/api/image?"));
+  const brokenImages=imageChecks.filter(x=>!x.ok||!x.imageOk).length;
+  const marketProblem=!markets.ok||markets.usdEgp<=0||markets.eurEgp<=0||markets.gbpEgp<=0||markets.gold24k<=0||markets.gold21k<=0||markets.gold18k<=0;
+  const articleProblem=articleChecks.some(x=>!x.ok||!x.hasArticleText||x.length<900||x.filler);
+  return {ok:checks.filter(x=>!String(x.path).startsWith("/api/image?")).every(x=>x.ok)&&brokenImages===0&&!marketProblem&&!articleProblem,production:PRODUCTION_URL,checks:checks.map(x=>{const y={...x};delete y.body;return y;}),articleChecks,markets,diagnostics:{newsProblem:Boolean(home?.hasNoNews||home?.size<3000||home?.malformedText),searchProblem:Boolean(arSearch?.hasNoNews||enSearch?.hasNoNews),imageProblem:brokenImages>0||Boolean(home&&!home.hasCardImages),marketProblem,articleProblem,layoutProblem:Boolean(home&&!home.hasCards),brokenImages}};
+}
 async function askAI(
   env,
   inspection,
@@ -1177,10 +1212,10 @@ Rules:
 - Do not rewrite the entire Worker unless genuinely necessary.
 - Prefer safe complete-file repairs.
 - Never include GITHUB_TOKEN.
-- Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, malformed text, or runtime errors as real defects requiring repair.
+- Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, weak or filler article bodies, malformed text, stale or missing market values, or runtime errors as real defects requiring repair.
 - If the live site has no news, repair the ingestion/fallback path so the homepage can recover news without waiting for a user action.
-- Search must return relevant results from both local cached news and a reliable external fallback when local news is empty.
-- Image failures must never prevent news cards from rendering; use relevant semantic fallbacks or omit the image.
+- Search must return relevant results from both local cached news and a reliable external fallback when local news is empty. Review every runtime diagnostic field and repair all confirmed defects in the allowed files; do not treat HTTP 200 alone as proof that the feature works.
+- Image failures must never prevent news cards from rendering; use relevant semantic fallbacks or omit the image. Article pages must contain a substantive source-grounded article, not a title plus generic filler. The Worker must fetch and extract primary-source evidence before asking Workers AI to write the article, and article-generation cache keys must be invalidated when generation logic changes.
 - Worker must remain Cloudflare Worker compatible.
 
 Current Worker source:
