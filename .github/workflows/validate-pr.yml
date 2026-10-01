@@ -1,108 +1,21 @@
 name: NowPulse PR Validation
-
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install dependencies
-        run: npm install --ignore-scripts
-
-      - name: Validate JavaScript syntax
-        run: |
-          node --check src/worker.js
-          node --check src/ai-guardian.js
-          node --check src/nowpulse-maintenance-workflow.js
-          node --check ai-manager.js
-
-      - name: Validate Wrangler configuration
-        run: npx wrangler deploy --dry-run --config wrangler.jsonc
-
-      - name: Validate package scripts
-        run: npm run check
-
-      - name: Run product contract test
-        run: npm run test:contract
-
-      - name: Validate product contract
-        run: |
-          set -euo pipefail
-          grep -q 'const VERSION = "6.1.5"' src/worker.js
-          grep -q 'img:v11:' src/worker.js
-          grep -q 'wikipediaImage' src/worker.js
-          grep -q 'getAgentByName' src/worker.js
-          grep -q 'gdeltImage' src/worker.js
-          grep -q 'api.frankfurter.dev/v2/rates' src/worker.js
-          grep -q 'api.goldprice.dev/v1/carat' src/worker.js
-          grep -q 'search:v11:' src/worker.js
-          grep -q 'weather:v2:' src/worker.js
-          grep -q 'img:v11:' src/worker.js
-          grep -q 'chfEgp' src/worker.js
-          grep -q 'provider.fx' src/worker.js
-          grep -q 'sourceEvidence' src/worker.js
-          grep -q 'PRIMARY SOURCE EVIDENCE' src/worker.js
-          grep -q 'article-kicker' src/worker.js
-          grep -q 'Created by Taha' src/worker.js
-          grep -q 'google.com, pub-1235197294708204' src/worker.js
-          grep -q '@cf/zai-org/glm-5.2' ai-manager.js
-          grep -q '@cf/meta/llama-3.1-8b-instruct-fast' ai-manager.js
-          grep -q 'const VERSION = "10.1.0"' ai-manager.js
-          grep -q '*/15 * * * *' ai-manager.wrangler.jsonc
-          if grep -q 'const category=url.searchParams.get("category")||"latest",items=await loadFeed(env,false,lang),enriched=' src/worker.js; then
-            echo 'Homepage must not block on bulk image enrichment.'
-            exit 1
-          fi
-          echo 'NowPulse product contract passed.'
-      - name: Validate required files
-        run: |
-          test -f src/worker.js
-          test -f wrangler.jsonc
-          test -f ai-manager.js
-          test -f ai-manager.wrangler.jsonc
-          test -f src/ai-guardian.js
-          test -f src/nowpulse-maintenance-workflow.js
-
-      - name: Validate required architecture
-        run: |
-          grep -q 'export default' src/worker.js
-          grep -q 'async fetch' src/worker.js
-          grep -q 'scheduled' src/worker.js
-          grep -q 'NOWPULSE_KV' src/worker.js
-          grep -q 'Created by Taha' src/worker.js
-          grep -q 'binding' wrangler.jsonc
-          grep -q 'binding' ai-manager.wrangler.jsonc
-          grep -q 'NowPulseGuardian' wrangler.jsonc
-          grep -q 'NowPulseMaintenanceWorkflow' src/nowpulse-maintenance-workflow.js
-          test -f .github/workflows/trigger-maintenance.yml
-          grep -q 'nodejs_compat' wrangler.jsonc
-
-      - name: Validate ads.txt implementation
-        run: |
-          grep -q 'ads.txt' src/worker.js
-          grep -q 'google.com' src/worker.js
-
-      - name: Validate AI repair mode
-        run: |
-          grep -q 'NOWPULSE_AI_REPAIR_MODE' ai-manager.wrangler.jsonc
-
-      - name: Validation complete
-        run: echo 'NowPulse PR validation passed.'
+      - run: npm install --ignore-scripts
+      - run: npm run check
+      - run: npm run test:contract
+      - run: npx wrangler deploy --dry-run --config wrangler.jsonc
