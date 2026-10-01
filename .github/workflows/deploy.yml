@@ -1,0 +1,85 @@
+name: NowPulse Main Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Validate JavaScript
+        run: npm run check
+
+      - name: Validate Wrangler configuration
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
+
+      - name: Verify required files
+        run: |
+          set -euo pipefail
+          test -f src/worker.js
+          test -f wrangler.jsonc
+          test -f src/ai-guardian.js
+          test -f src/nowpulse-maintenance-workflow.js
+          test -f package.json
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${NOWPULSE_GITHUB_TOKEN:-}"
+
+      - name: Deploy NowPulse
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Install GitHub token on NowPulse Worker
+        run: |
+          printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://nowpulse.tavengers16.workers.dev"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if body="$(curl -fsSL --max-time 15 "$base/health" 2>/dev/null)"; then
+              echo "$body"
+              echo "$body" | grep -q '"ok":true'
+              echo "$body" | grep -q '"service":"NowPulse"'
+              echo "$body" | grep -q '"version":"6.1.0"'
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production health verification failed."
+          exit 1
+
+      - name: Verify production APIs
+        run: |
+          set -euo pipefail
+          base="https://nowpulse.tavengers16.workers.dev"
+          markets="$(curl -fsSL --max-time 20 "$base/api/markets")"
+          for key in usdEgp eurEgp gbpEgp gold24k gold21k gold18k; do
+            echo "$markets" | grep -q ""$key""
+          done
+          curl -fsSL --max-time 20 "$base/api/ai/status" | grep -q '"service"'
+          curl -fsSL --max-time 20 "$base/sitemap.xml" | grep -q '<urlset'
+          curl -fsSL --max-time 20 "$base/ads.txt" | grep -q 'google.com'
+          curl -fsSL --max-time 20 "$base/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar" | grep -q 'NowPulse'
+          echo "Production smoke tests passed."
