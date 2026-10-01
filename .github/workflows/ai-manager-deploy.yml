@@ -31,3 +31,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
         run: printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config ai-manager.wrangler.jsonc
+      - name: Verify AI Manager
+        run: |
+          set -e
+          test_url="https://nowpulse-ai-manager.tavengers16.workers.dev/health"
+          for i in $(seq 1 12); do
+            x=$(curl -fsSL --max-time 15 "$test_url" || true)
+            echo "$x"
+            if echo "$x" | grep -q '"ok":true' && echo "$x" | grep -q '"ai":true'; then exit 0; fi
+            sleep 5
+          done
+          exit 1
