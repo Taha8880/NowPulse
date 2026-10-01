@@ -3,7 +3,7 @@ const worker=fs.readFileSync("src/worker.js","utf8");
 const manager=fs.readFileSync("ai-manager.js","utf8");
 
 const required=[
-  ["version","const VERSION = \"6.0.0\""],
+  ["version","const VERSION = \"6.1.0\""],
   ["semantic image blacklist","logo|icon|sprite|favicon|avatar|placeholder"],
   ["semantic image fallback","wikipediaImage"],
   ["GDELT image fallback","gdeltImage"],
@@ -25,5 +25,5 @@ for(const [name,needle] of required){
 }
 if(worker.includes('const category=url.searchParams.get("category")||"latest",items=await loadFeed(env,false,lang),enriched=')
   throw new Error("Home render must not block on bulk image enrichment.");
-if(!worker.includes('const key="img:v5:"+a.id')) throw new Error("Image cache generation was not bumped.");
+if(!worker.includes('const key="img:v6:"+a.id')) throw new Error("Image cache generation was not bumped.");
 console.log("NowPulse product contract checks passed:",required.length);
