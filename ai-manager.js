@@ -1,4 +1,4 @@
-const VERSION = "10.0.0";
+const VERSION = "10.1.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
@@ -19,6 +19,9 @@ const ALLOWED_REPAIR_FILES = new Set([
   "package.json",
   "src/ai-guardian.js",
   "src/nowpulse-maintenance-workflow.js",
+  ".github/workflows/ai-repair-auto-merge.yml",
+  ".github/workflows/deploy.yml",
+  ".github/workflows/deploy-ai-manager.yml",
   "AGENTS.md",
   "AI_MEMORY.md"
 ]);
