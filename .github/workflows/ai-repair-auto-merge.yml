@@ -1,0 +1,35 @@
+name: NowPulse AI Repair Auto Merge
+
+on:
+  workflow_run:
+    workflows: ["NowPulse PR Validation"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge-ai-repair:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge validated AI repair
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -e
+          prs=$(gh api --paginate "/repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts | length' 2>/dev/null || true)
+          branch=$(gh api "/repos/$REPO/actions/runs/$RUN_ID" --jq '.head_branch')
+          if [[ "$branch" != ai-repair/* ]]; then
+            echo "Not an AI repair branch: $branch"
+            exit 0
+          fi
+          pr=$(gh pr list --repo "$REPO" --state open --head "$branch" --base main --json number,title --jq '.[] | select(.title=="NowPulse AI safe repair") | .number' | head -n1)
+          if [[ -z "$pr" ]]; then
+            echo "No matching AI repair PR."
+            exit 0
+          fi
+          gh pr merge "$pr" --repo "$REPO" --squash --delete-branch --subject "Merge validated NowPulse AI repair"
