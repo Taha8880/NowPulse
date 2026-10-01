@@ -265,23 +265,27 @@ async function localizeArticle(env,a,lang="ar"){
 
 function relatedFor(article,items){const stop=new Set(["من","في","على","عن","إلى","مع","هذا","هذه","ذلك","التي","الذي","the","and","for","with","from","news","بعد","قبل","اليوم","أمس"]);const tokens=new Set(cleanText(article.title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^\p{L}\p{N}]/gu,"")).filter(x=>x.length>3&&!stop.has(x)));return items.filter(x=>x.id!==article.id).map(x=>{const xt=cleanText(x.title).toLowerCase().split(/\s+/).map(t=>t.replace(/[^\p{L}\p{N}]/gu,""));const score=xt.reduce((n,t)=>n+(tokens.has(t)?1:0),0);return{...x,score};}).filter(x=>x.score>=2).sort((a,b)=>b.score-a.score).slice(0,5);}
 function htmlArticleText(html){
-  const src=String(html||"");
+  let src=String(html||"");
+  src=src.replace(/<script[\\s\\S]*?<\\/script>/gi,"").replace(/<style[\\s\\S]*?<\\/style>/gi,"");
+  src=src.replace(/<(nav|header|footer|aside|form|button)[^>]*>[\\s\\S]*?<\\/\\1>/gi,"");
+  src=src.replace(/<([a-z0-9]+)[^>]*(?:class|id)=["'][^"']*(?:share|social|recommend|related|breadcrumb|menu|navigation|subscribe|newsletter|advert|promo|cookie|footer|header)[^"']*["'][^>]*>[\\s\\S]*?<\\/\\1>/gi,"");
   const bodies=[];
-  for(const m of src.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){
+  for(const m of String(html||"").matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
     try{
-      const d=JSON.parse(m[1].trim());
-      const arr=Array.isArray(d)?d:[d];
+      const d=JSON.parse(m[1].trim()),arr=Array.isArray(d)?d:[d];
       for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
     }catch{}
   }
-  const p=[...src.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
-  bodies.push(p.join("\n"));
-  for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
-  return bodies.map(cleanText).sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
+  const p=[...src.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
+  bodies.push(p.join("\\n"));
+  for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
+  const junk=/^(?:primary page extract|news source|listen|save|share|recommended stories|advertisement|add .* on google|social media|share-nodes|facebook|whatsapp|copylink|google|info)$/i;
+  const cleaned=bodies.map(cleanText).map(x=>x.replace(/\\s+/g," ").replace(/(?:Listen|Save|Share|Advertisement|Recommended Stories|Add .*? on Google|social media|share-nodes|facebook|whatsapp|copylink|google|info)(?:\\s|$)/gi," ").trim()).filter(x=>x.length>=100&&!junk.test(x));
+  return cleaned.sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
 }
 async function sourceEvidence(article,env,lang="ar"){const evidence=[];if(article.description)evidence.push("FEED DESCRIPTION:\n"+article.description);try{const r=await timeoutFetch(article.link,{redirect:"follow",headers:{"user-agent":"Mozilla/5.0 NowPulse/7.0","accept":"text/html,application/xhtml+xml,text/plain"}},9000);if(r.ok){const t=htmlArticleText(await r.text());if(t.length>=500)evidence.push("PRIMARY PAGE EXTRACT:\n"+t.slice(0,14000));}}catch{}try{const ext=await externalSearchEvidence(env,article.title,lang);const rel=ext.results.filter(x=>x.link&&x.link!==article.link).slice(0,8);if(rel.length)evidence.push("INDEPENDENT EXTERNAL COVERAGE:\n"+rel.map(x=>x.source+" | "+x.title+"\n"+(x.description||"")+"\n"+(x.link||"")).join("\n\n"));}catch{}return evidence.join("\n\n").slice(0,26000)}
 async function writeArticle(env,article,related,lang="ar"){
-  const cacheKey="article:v4:"+lang+":"+article.id;
+  const cacheKey="article:v5:"+lang+":"+article.id;
   if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(cacheKey).catch(()=>null);if(cached&&cached.length>600)return cached;}
   const evidence=await sourceEvidence(article,env,lang);
   if(!env.AI)return fallbackArticle(article,evidence);
@@ -312,9 +316,10 @@ Write the finished article now. Every factual claim must be grounded in the supp
   }catch(e){console.error("AI article generation failed",e?.message||e);return fallbackArticle(article,evidence);}
 }
 function fallbackArticle(a,evidence=""){
-  const t=cleanText(evidence);
-  if(t.length>=500){const p=t.replace(/\n+/g," ").split(/(?<=[.!؟])\s+/u).filter(x=>x.length>45).slice(0,14);if(p.length>=5)return p.join(" ");}
-  return [a.title,a.description||"تعذر استخراج نص المصدر الأصلي حاليًا، ولن يتم اختلاق تفاصيل غير مؤكدة.","سيعاد بناء المادة عند توفر المصدر."].filter(Boolean).join("\n\n");
+  let t=cleanText(evidence).replace(/PRIMARY PAGE EXTRACT:\\s*/gi,"").replace(/FEED DESCRIPTION:\\s*/gi,"").replace(/INDEPENDENT EXTERNAL COVERAGE:/gi,"");
+  t=t.replace(/https?:\\/\\/\\S+/g,"").replace(/(?:Listen|Save|Share|Advertisement|Recommended Stories|Add .*? on Google|social media|share-nodes|facebook|whatsapp|copylink|google|info)\\b/gi," ").replace(/\\s+/g," ").trim();
+  if(t.length>=500){const p=t.split(/(?<=[.!؟])\\s+/u).filter(x=>x.length>55).slice(0,16);if(p.length>=5)return "## ملخص الخبر\\n"+p.slice(0,3).join(" ")+"\\n\\n## التفاصيل\\n"+p.slice(3,9).join(" ")+"\\n\\n## السياق\\n"+p.slice(9,13).join(" ")+"\\n\\n## ما الذي نعرفه حتى الآن\\n"+p.slice(13).join(" ");}
+  return [a.description||a.title,"تعذر توليد نص تحريري كامل من المصادر المتاحة حاليًا. سيتم تحديث المادة عند توفر معلومات موثوقة إضافية."].filter(Boolean).join("\n\n");
 }
 async function externalSearchEvidence(env,q,lang="ar"){const query=cleanText(q).slice(0,160);if(!query)return{results:[],evidence:""};const newsUrl="https://news.google.com/rss/search?q="+encodeURIComponent(query+" when:30d")+"&hl="+(lang==="ar"?"ar":"en")+"&gl=EG&ceid=EG:"+(lang==="ar"?"ar":"en");const gdUrl="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(query)+"&mode=artlist&format=json&maxrecords=75&timespan=1y&sort=datedesc";const wikiUrl="https://"+(lang==="ar"?"ar":"en")+".wikipedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrnamespace=0&gsrlimit=10&prop=extracts&exintro=1&explaintext=1&format=json&origin=*";const [news,gd,wiki]=await Promise.all([timeoutFetch(newsUrl,{headers:{accept:"application/rss+xml, application/xml, text/xml"}},6000).catch(()=>null),timeoutFetch(gdUrl,{headers:{accept:"application/json","user-agent":"NowPulse/1.0"}},6000).catch(()=>null),timeoutFetch(wikiUrl,{headers:{accept:"application/json"}},5000).catch(()=>null)]);const out=[];try{if(news?.ok)out.push(...xmlItems(await news.text()).map(x=>normalizeArticle(x,"world")).filter(x=>x.title));}catch{}try{if(gd?.ok){const d=await gd.json();out.push(...(Array.isArray(d?.articles)?d.articles:[]).map(x=>normalizeArticle({title:x.title,link:x.url,description:x.description||"",source:x.domain||"GDELT",date:x.seendate,originalImage:x.socialimage||""},"world")).filter(x=>x.title&&x.link));}}catch{}const wikiItems=[];try{if(wiki?.ok){const d=await wiki.json();for(const x of Object.values(d?.query?.pages||{})){if(x?.title&&x?.extract)wikiItems.push({title:x.title,description:x.extract.slice(0,1800),source:"Wikipedia",link:"https://"+(lang==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),date:new Date().toISOString(),category:"world",region:"world",id:"wiki-"+makeId({title:x.title,link:x.title})});}}}catch{}const map=new Map();for(const a of [...out,...wikiItems]){const k=a.link||a.title;if(!map.has(k))map.set(k,a)}const relevance=a=>{const h=(a.title+" "+a.description).toLowerCase(),qq=query.toLowerCase();return (h.includes(qq)?50:0)+(h.split(/\s+/).filter(w=>qq.includes(w)&&w.length>2).length*2)};const results=[...map.values()].sort((a,b)=>relevance(b)-relevance(a)||new Date(b.date)-new Date(a.date)).slice(0,50);const evidence=results.slice(0,15).map((a,i)=>"SOURCE "+(i+1)+": "+a.source+" | "+a.title+"\n"+(a.description||"")+"\nURL: "+(a.link||"")).join("\n\n");return{results,evidence};}
 async function searchNews(env,q,lang="ar"){q=cleanText(q).slice(0,120);if(!q)return[];const key="search:v11:"+lang+":"+encodeURIComponent(q.toLowerCase());if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(key,"json").catch(()=>null);if(Array.isArray(cached)&&cached.length)return cached;}const ext=await externalSearchEvidence(env,q,lang),norm=s=>cleanText(s).toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[إأآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[^\p{L}\p{N}]+/gu," ").trim(),terms=norm(q).split(/\s+/).filter(t=>t.length>1),local=[];for(const l of lang==="en"?["en","ar"]:["ar","en"]){const a=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:latest:"+l,"json").catch(()=>[]):[],b=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:archive:"+l,"json").catch(()=>[]):[];local.push(...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[]));}const score=a=>{const h=norm((a.title||"")+" "+(a.description||"")+" "+(a.source||""));return terms.reduce((n,t)=>n+(h.includes(t)?1:0),0)};const map=new Map();for(const a of [...local.filter(a=>score(a)>0),...ext.results]){const k=a.link||a.title;if(!map.has(k))map.set(k,a)}const result=[...map.values()].sort((a,b)=>score(b)-score(a)||new Date(b.date)-new Date(a.date)).slice(0,40);if(env.NOWPULSE_KV&&result.length){await env.NOWPULSE_KV.put(key,JSON.stringify(result),{expirationTtl:60}).catch(()=>{});for(const a of result.slice(0,20))await env.NOWPULSE_KV.put("article:"+a.id,JSON.stringify(a),{expirationTtl:604800}).catch(()=>{})}return result;}
@@ -482,7 +487,7 @@ function articleBody(a,body,l,related=[]){
       paragraphIndex++;
     }
   }
-  if(!rendered.length)rendered.push("<p class=\\"article-lead\\">"+esc(lead)+"</p>");
+  if(!rendered.length)rendered.push('<p class="article-lead">'+esc(lead)+'</p>');
   const relatedItems=(related||[]).filter(x=>x&&x.id!==a.id).slice(0,5);
   const location=a.location||a.city||"";
   const published=a.date?new Date(a.date):null;
