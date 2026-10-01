@@ -101,7 +101,7 @@ jobs:
       - name: Install GitHub token on Cloudflare
         run: |
           printf '%s' "$NOWPULSE_GITHUB_TOKEN" \
-            | npx wrangler secret put GITHUB_TOKEN \
+            | npx wrangler secret put NOWPULSE_GITHUB_TOKEN \
               --config ai-manager.wrangler.jsonc
 
         env:
