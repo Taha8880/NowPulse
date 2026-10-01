@@ -366,7 +366,7 @@ function sectionHtml(key,items,lang){
 
 async function home(env,lang){
  const data=await news(env,lang,"latest");
- const m=await markets(env);
+ const m={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null};
  const w=await weather(env,"cairo");
  const ar=lang==="ar";
  const value=v=>typeof v==="number"&&v>0?v.toFixed(2):"—";
