@@ -236,32 +236,35 @@ async function markets(env){
  const old=await cacheRead(env,key);
  if(old&&now()-old.saved<TTL.markets*1000)return old.data;
  const data={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null,updated:null};
- let fx=null,gold=null;
- const [fxResult,goldResult]=await Promise.allSettled([
-  fetchJson("https://open.er-api.com/v6/latest/USD"),
-  fetchJson("https://api.gold-api.com/price/XAU")
- ]);
- if(fxResult.status==="fulfilled")fx=fxResult.value;
- if(goldResult.status==="fulfilled")gold=goldResult.value;
- const e=Number(fx?.rates?.EGP),eur=Number(fx?.rates?.EUR),gbp=Number(fx?.rates?.GBP),chf=Number(fx?.rates?.CHF);
- if(e>0){
-  data.usdEgp=e;
-  if(eur>0)data.eurEgp=e/eur;
-  if(gbp>0)data.gbpEgp=e/gbp;
-  if(chf>0)data.chfEgp=e/chf;
- }
- const ozUsd=Number(gold?.price);
- if(ozUsd>0&&e>0){
-  const gram24=ozUsd*e/31.1034768;
-  data.gold24=gram24;
-  data.gold21=gram24*.875;
-  data.gold18=gram24*.75;
- }
+ try{
+  const feed=await fetchJson("https://getdaleelak.com/api/v1/feed.json");
+  const assets=Array.isArray(feed?.assets)?feed.assets:[];
+  const value=a=>Number(a?.global?.value)>0?Number(a.global.value):Number(a?.benchmark?.sell)>0?Number(a.benchmark.sell):Number(a?.directions?.sell?.best?.value)>0?Number(a.directions.sell.best.value):null;
+  const findCurrency=code=>assets.find(a=>String(a?.id||"").toUpperCase()===code+"-EGP")||assets.find(a=>String(a?.slug||"").toLowerCase().includes(code.toLowerCase())&&String(a?.unit||"").includes("EGP"));
+  data.usdEgp=value(findCurrency("USD"));
+  data.eurEgp=value(findCurrency("EUR"));
+  data.gbpEgp=value(findCurrency("GBP"));
+  data.chfEgp=value(findCurrency("CHF"));
+  const metals=assets.filter(a=>String(a?.category||"").toLowerCase()==="metals"||/gold|xau|ذهب/i.test(String(a?.id||"")+" "+String(a?.slug||"")+" "+String(a?.unit||"")));
+  const goldValue=a=>value(a);
+  for(const a of metals){
+   const s=(String(a?.id||"")+" "+String(a?.slug||"")+" "+String(a?.unit||"")).toLowerCase();
+   const v=goldValue(a); if(!(v>0))continue;
+   if(/24\s*k|24k|عيار.?24/.test(s))data.gold24=v;
+   else if(/21\s*k|21k|عيار.?21/.test(s))data.gold21=v;
+   else if(/18\s*k|18k|عيار.?18/.test(s))data.gold18=v;
+  }
+  const generic=metals.map(goldValue).find(v=>v>0);
+  if(generic>0){
+   if(!data.gold24)data.gold24=generic;
+   if(!data.gold21)data.gold21=data.gold24*.875;
+   if(!data.gold18)data.gold18=data.gold24*.75;
+  }
+ }catch{}
  data.updated=new Date().toISOString();
  if(Object.values(data).some(v=>typeof v==="number"&&v>0))await cacheWrite(env,key,data,TTL.markets);
  return old?.data&&!Object.values(data).some(v=>typeof v==="number"&&v>0)?old.data:data;
 }
-
 async function weather(env,city="cairo"){
  const key="np9:weather:"+city;
  const old=await cacheRead(env,key);
