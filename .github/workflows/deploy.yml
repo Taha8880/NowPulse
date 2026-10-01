@@ -48,3 +48,4 @@ jobs:
           curl -fsSL "$base/api/news" | grep -q '\['
           curl -fsSL "$base/api/markets" | grep -q 'usdEgp'
           curl -fsSL "$base/sitemap.xml" | grep -q '<urlset'
+# Stability trigger: validate and deploy the restored v7 baseline.
