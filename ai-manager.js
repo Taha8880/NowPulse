@@ -1,4 +1,4 @@
-const VERSION = "8.4.0";
+const VERSION = "8.5.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
@@ -1761,6 +1761,8 @@ async function health(env) {
   };
 }
 
+async function saveAIStatus(env,data){if(!env.NOWPULSE_KV)return;try{await env.NOWPULSE_KV.put("ai:guardian:status",JSON.stringify({...data,lastRun:new Date().toISOString(),version:VERSION}),{expirationTtl:172800});}catch(error){console.error("AI status persistence failed",error?.stack||error);}}
+
 async function handleRepair(env) {
   try {
     const result =
@@ -1910,17 +1912,20 @@ export default {
 
   async scheduled(event, env, ctx) {
     const mode = env.NOWPULSE_AI_REPAIR_MODE || "safe";
-
     try {
       if (mode === "auto") {
-        await runRepair(env);
+        const result = await runRepair(env);
+        const d = result?.diagnostics || result?.inspection?.diagnostics || {};
+        await saveAIStatus(env,{status:result?.repairRequired?"repairing":"healthy",repairRequired:Boolean(result?.repairRequired),diagnosis:result?.diagnosis||"Autonomous audit completed.",checks:{newsProblem:Boolean(d.newsProblem),articleProblem:Boolean(d.articleProblem),imageProblem:Boolean(d.imageProblem),marketProblem:Boolean(d.marketProblem),searchProblem:Boolean(d.searchProblem),layoutProblem:Boolean(d.layoutProblem)}});
         return;
       }
-
       if (mode === "safe") {
-        await inspectProject(env);
+        const result = await inspectProject(env);
+        const d=result?.diagnostics||{};
+        await saveAIStatus(env,{status:"healthy",repairRequired:false,diagnosis:"Inspection completed in safe mode.",checks:{newsProblem:Boolean(d.newsProblem),articleProblem:Boolean(d.articleProblem),imageProblem:Boolean(d.imageProblem),marketProblem:Boolean(d.marketProblem),searchProblem:Boolean(d.searchProblem),layoutProblem:Boolean(d.layoutProblem)}});
       }
     } catch (error) {
+      await saveAIStatus(env,{status:"error",repairRequired:false,diagnosis:String(error?.message||error)});
       console.error("Scheduled AI maintenance failed", error?.stack || error);
     }
   }
