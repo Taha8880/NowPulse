@@ -83,3 +83,11 @@ The AI is expected to inspect the complete product on schedule without waiting f
 - AI Manager uses GLM-5.2 as primary reasoning with Llama fallback.
 - Product contract tests must run in CI and protect news, images, markets, article evidence, Story Hub, SEO and AdSense requirements.
 - No dead TimeShift UI is required; future story-evolution features must be implemented only when they have a complete user-facing flow and reliable evidence.
+
+
+## 2026-10-01 Integrity Audit
+- Worker version: 6.1.2.
+- Arabic default feed is Egypt-first, then Arab coverage, with worldwide politics retained.
+- Search cache keys are query-specific; weather, markets, and semantic image endpoints have dedicated verification paths.
+- Market contract includes USD/EGP, EUR/EGP, GBP/EGP, CHF/EGP, and gold 24K/21K/18K.
+- Production self-healing and AI Guardian checks must preserve existing SEO, AdSense, RTL/LTR, article generation, weather, markets, search, and image behavior.
