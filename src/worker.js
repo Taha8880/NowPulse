@@ -112,7 +112,6 @@ async function fetchHtmlNews(url,category){try{
   for(const m of html.matchAll(re)){
     const href=resolveUrl(m[1],url),title=cleanText(m[2]);
     if(!href||!title||title.length<18||title.length>240||seen.has(href))continue;
-    if(!/\\/(?:news|portal)\\//i.test(href)||href.startsWith(base+"/")){}
     const validPath=/(?:\\/)(?:news|portal)(?:\\/)/i.test(new URL(href).pathname);
     if(!validPath)continue;
     if(/^(home|egypt|politics|business|world|sports|health|tourism|latest news|more news|read more|full story)$/i.test(title))continue;
