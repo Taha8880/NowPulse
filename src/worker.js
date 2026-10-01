@@ -482,7 +482,7 @@ function articleBody(a,body,l,related=[]){
       paragraphIndex++;
     }
   }
-  if(!rendered.length)rendered.push("<p class="article-lead">"+esc(lead)+"</p>");
+  if(!rendered.length)rendered.push("<p class=\\"article-lead\\">"+esc(lead)+"</p>");
   const relatedItems=(related||[]).filter(x=>x&&x.id!==a.id).slice(0,5);
   const location=a.location||a.city||"";
   const published=a.date?new Date(a.date):null;
