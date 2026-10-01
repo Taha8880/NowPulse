@@ -23,7 +23,7 @@
   },
 
   "vars": {
-    "NOWPULSE_AI_REPAIR_MODE": "safe",
+    "NOWPULSE_AI_REPAIR_MODE": "auto",
     "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
     "NOWPULSE_GITHUB_BRANCH": "main",
     "NOWPULSE_WORKER_FILE": "src/worker.js"
