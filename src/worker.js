@@ -58,7 +58,7 @@ const QUOTES=[
 {ar:"لا تستسلم لمجرد أن الطريق طويل.",en:"Do not give up just because the road is long."},
 {ar:"التعلم اليوم يصنع نجاح الغد.",en:"Learning today builds tomorrow's success."},
 {ar:"تقدم ولو ببطء، المهم ألا تتوقف.",en:"Move forward slowly if needed, but keep moving."},
-{ar:"الكلمة الطيبة تترك أثرًا جميلًا.",en:"A kind word leaves a lasting أثر."},
+{ar:"الكلمة الطيبة تترك أثرًا جميلًا.",en:"A kind word leaves a lasting impression."},
 {ar:"ابتسامتك قد تغيّر يوم شخص.",en:"Your smile may brighten someone's day."},
 {ar:"كن أفضل نسخة من نفسك.",en:"Be the best version of yourself."},
 {ar:"الفرص تأتي لمن يستعد لها.",en:"Opportunities come to those who prepare."},
@@ -81,7 +81,7 @@ const QUOTES=[
 {ar:"اجعل نيتك طيبة، وسعيك صادقًا.",en:"Keep your intentions good and your effort sincere."},
 {ar:"كل صباح فرصة لتبدأ من جديد.",en:"Every morning is a chance to start again."},
 {ar:"لا تستهن بخطوة صغيرة.",en:"Never underestimate a small step."},
-{ar:"افعل الخير، وسيبقى أثره.",en:"Do good, and its أثر will remain."}
+{ar:"افعل الخير، وسيبقى أثره.",en:"Do good, and its impact will remain."}
 ];
 const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 function cleanText(v){let s=String(v??"");for(let i=0;i<3;i++)s=s.replace(/&(#x[0-9a-f]+|#\d+|nbsp|amp|quot|apos|lt|gt);?/gi,(m,e)=>{const k=e.toLowerCase();if(k==="nbsp")return" ";if(k==="amp")return"&";if(k==="quot")return'"';if(k==="apos")return"'";if(k==="lt")return"<";if(k==="gt")return">";const n=k.startsWith("#x")?parseInt(k.slice(2),16):parseInt(k.slice(1),10);return Number.isFinite(n)&&n>=0&&n<=0x10ffff?String.fromCodePoint(n):" ";});return s.replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();}
