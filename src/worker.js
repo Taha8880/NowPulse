@@ -237,7 +237,32 @@ async function enrichImages(env,items){
   }
   return [...out,...rest];
 }
-function aiText(r){return r?.response||r?.result?.response||r?.output_text||"";}\nasync function localizeArticle(env,a,lang="ar"){\n  if(lang!=="ar")return a;\n  const title=String(a?.title||"");\n  const arabic=(title.match(/[\u0600-\u06FF]/g)||[]).length;\n  const latin=(title.match(/[A-Za-z]/g)||[]).length;\n  if(!title||arabic>=Math.max(4,latin))return a;\n  const key="localized:v1:ar:"+a.id;\n  if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(key,"json").catch(()=>null);if(cached?.title)return {...a,...cached};}\n  if(!env.AI)return a;\n  const prompt={messages:[\n    {role:"system",content:"You are a professional Arabic news editor. Translate and localize the supplied news headline and short description into clear Modern Standard Arabic. Preserve names, organizations, numbers and factual meaning. Do not add information. Return JSON only with keys title and description."},\n    {role:"user",content:JSON.stringify({title:a.title,description:a.description||""})}\n  ],max_tokens:500,temperature:0.05};\n  try{\n    const raw=aiText(await env.AI.run(AI_MODEL,prompt,{temperature:0.05,max_completion_tokens:700})).trim().replace(/^```json\s*/i,"").replace(/\s*```$/,"");\n    const x=JSON.parse(raw);\n    if(x?.title){\n      const localized={title:cleanText(x.title),description:cleanText(x.description||a.description||"")};\n      if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(key,JSON.stringify(localized),{expirationTtl:86400}).catch(()=>{});\n      return {...a,...localized};\n    }\n  }catch{}\n  return a;\n}\n
+function aiText(r){return r?.response||r?.result?.response||r?.output_text||"";}
+async function localizeArticle(env,a,lang="ar"){
+  if(lang!=="ar")return a;
+  const title=String(a?.title||"");
+  const arabic=(title.match(/[\u0600-\u06FF]/g)||[]).length;
+  const latin=(title.match(/[A-Za-z]/g)||[]).length;
+  if(!title||arabic>=Math.max(4,latin))return a;
+  const key="localized:v1:ar:"+a.id;
+  if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(key,"json").catch(()=>null);if(cached?.title)return {...a,...cached};}
+  if(!env.AI)return a;
+  const prompt={messages:[
+    {role:"system",content:"You are a professional Arabic news editor. Translate and localize the supplied news headline and short description into clear Modern Standard Arabic. Preserve names, organizations, numbers and factual meaning. Do not add information. Return JSON only with keys title and description."},
+    {role:"user",content:JSON.stringify({title:a.title,description:a.description||""})}
+  ],max_tokens:500,temperature:0.05};
+  try{
+    const raw=aiText(await env.AI.run(AI_MODEL,prompt,{temperature:0.05,max_completion_tokens:700})).trim().replace(/^```json\s*/i,"").replace(/\s*```$/,"");
+    const x=JSON.parse(raw);
+    if(x?.title){
+      const localized={title:cleanText(x.title),description:cleanText(x.description||a.description||"")};
+      if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(key,JSON.stringify(localized),{expirationTtl:86400}).catch(()=>{});
+      return {...a,...localized};
+    }
+  }catch{}
+  return a;
+}
+
 function relatedFor(article,items){const stop=new Set(["من","في","على","عن","إلى","مع","هذا","هذه","ذلك","التي","الذي","the","and","for","with","from","news","بعد","قبل","اليوم","أمس"]);const tokens=new Set(cleanText(article.title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^\p{L}\p{N}]/gu,"")).filter(x=>x.length>3&&!stop.has(x)));return items.filter(x=>x.id!==article.id).map(x=>{const xt=cleanText(x.title).toLowerCase().split(/\s+/).map(t=>t.replace(/[^\p{L}\p{N}]/gu,""));const score=xt.reduce((n,t)=>n+(tokens.has(t)?1:0),0);return{...x,score};}).filter(x=>x.score>=2).sort((a,b)=>b.score-a.score).slice(0,5);}
 function htmlArticleText(html){
   const src=String(html||"");
