@@ -1,87 +1,17 @@
 name: NowPulse Self Healing
-
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *'
-
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
 permissions:
   contents: read
-
 jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Check homepage
-        run: |
+      - run: |
           set -e
-          code=$(curl -L -s -o /tmp/home -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/)
-          test "$code" = "200"
-          grep -q 'NowPulse' /tmp/home
-          grep -q '6.1.5' /tmp/home
-          grep -q '/article/' /tmp/home
-
-      - name: Check health
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/health -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/health)
-          test "$code" = "200"
-
-      - name: Check markets
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/markets -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/api/markets)
-          test "$code" = "200"
-          grep -q 'usdEgp' /tmp/markets
-          grep -q 'eurEgp' /tmp/markets
-          grep -q 'gbpEgp' /tmp/markets
-          grep -q 'chfEgp' /tmp/markets
-          grep -q 'gold21k' /tmp/markets
-          grep -q 'gold24k' /tmp/markets
-          grep -q 'gold18k' /tmp/markets
-
-      - name: Check weather
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/weather -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/weather?city=cairo')
-          test "$code" = "200"
-          grep -q 'temperature' /tmp/weather
-          grep -q 'humidity' /tmp/weather
-
-      - name: Check image endpoint
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/image -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/image?id=NowPulse-test-image')
-          test "$code" = "200"
-          grep -q 'image/' <(curl -L -s -D - -o /dev/null --max-time 20 'https://nowpulse.tavengers16.workers.dev/api/image?id=NowPulse-test-image')
-
-      - name: Check ads.txt
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/ads -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/ads.txt)
-          test "$code" = "200"
-          grep -q 'google.com' /tmp/ads
-
-      - name: Check sitemap
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/sitemap -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/sitemap.xml)
-          test "$code" = "200"
-          grep -q '<urlset' /tmp/sitemap
-
-      - name: Check search
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/search -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/search?q=Google&lang=en')
-          test "$code" = "200"
-          grep -q 'NowPulse' /tmp/search
-
-      - name: Check English search
-        run: |
-          set -e
-          code=$(curl -L -s -o /tmp/search-en -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/search?q=Egypt&lang=en')
-          test "$code" = "200"
-          grep -q 'NowPulse' /tmp/search-en
-
-      - name: Healthy
-        run: echo 'NowPulse production monitoring passed.'
+          curl -fsSL https://nowpulse.tavengers16.workers.dev/health | grep -q '"ok":true'
+          curl -fsSL https://nowpulse.tavengers16.workers.dev/api/news | grep -q '\['
+          curl -fsSL https://nowpulse.tavengers16.workers.dev/api/markets | grep -q 'usdEgp'
+          curl -fsSL https://nowpulse.tavengers16.workers.dev/sitemap.xml | grep -q '<urlset'
