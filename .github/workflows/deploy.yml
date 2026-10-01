@@ -56,7 +56,7 @@ jobs:
           grep -q 'NowPulseMaintenanceWorkflow' wrangler.jsonc
           grep -q '"type": "workflow"' wrangler.jsonc
           grep -q '"schedules"' wrangler.jsonc
-          grep -q '*/15 * * * *' wrangler.jsonc
+          grep -Fq '*/15 * * * *' wrangler.jsonc
           grep -q 'NOWPULSE_GITHUB_TOKEN' src/nowpulse-maintenance-workflow.js
           grep -q 'getAgentByName' src/nowpulse-maintenance-workflow.js
           echo "Autonomous architecture contract passed."
