@@ -99,7 +99,8 @@ async function enrichImages(env,items){
       let image=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(key).catch(()=>null):null;
       
       if(!image) image=await extractImage(a);
-      if(!image) image=await wikipediaImage(a.title);\n      if(!image) image=await wikimediaImage(a.title);
+      if(!image) image=await wikipediaImage(a.title);
+      if(!image) image=await wikimediaImage(a.title);
       if(image && env.NOWPULSE_KV) await env.NOWPULSE_KV.put(key,image,{expirationTtl:604800}).catch(()=>{});
       return {...a,image:image||""};
     }));
