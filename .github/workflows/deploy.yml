@@ -39,7 +39,11 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
-          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
+          if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "Cloudflare account ID is configured."
+          else
+            echo "Cloudflare account ID secret is not set; Wrangler will use the account associated with the API token."
+          fi
 
       - name: Deploy to Cloudflare
         shell: bash
