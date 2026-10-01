@@ -10,7 +10,8 @@
   },
   "scripts": {
     "check": "node --check src/worker.js && node --check src/ai-guardian.js && node --check src/nowpulse-maintenance-workflow.js && node --check ai-manager.js",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:contract": "node tests/product-contract.mjs"
   },
   "dependencies": {
     "agents": "^0.24.0"
