@@ -1431,6 +1431,9 @@ async function runRepair(env) {
   const inspection =
     await inspectProject(env);
 
+  const runtime = await runtimeInspection();
+  inspection.runtime = runtime;
+
   const worker =
     await getFile(
       env,
