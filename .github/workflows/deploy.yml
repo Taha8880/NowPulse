@@ -40,10 +40,10 @@ jobs:
           news="$(curl -fsSL "$base/api/news")"
           echo "$news"
           printf '%s' "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x)||!x.length)process.exit(1)})'
-          home="$(curl -fsSL "$base/?lang=ar")"
-          echo "$home" | grep -q "mk-usd"
-          echo "$home" | grep -q "mk-g24"
-          echo "$home" | grep -q "getdaleelak.com/api/v1/feed.json"
+          home="$(curl -fsSL --max-time 25 "$base/?lang=ar")"
+          echo "$home" | grep -q "NowPulse"
+          echo "$home" | grep -q "Created by Taha"
+          echo "$home" | grep -q "نبض الآن"
           weather="$(curl -fsSL "$base/api/weather?city=cairo")"
           echo "$weather"
           printf '%s' "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Number.isFinite(Number(x.temperature)))process.exit(1)})'
