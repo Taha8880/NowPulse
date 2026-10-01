@@ -82,6 +82,13 @@ Core requirements:
 28. Never expose GITHUB_TOKEN.
 29. Only modify the NowPulse repository.
 30. Political/news content must remain factual and neutral.
+31. Egypt is the primary news market and must receive the strongest feed coverage.
+32. Arab-country news is the second priority; international news is secondary.
+33. Arabic is the default site language; English is an alternate interface/content language.
+34. Never use a publisher logo, favicon, avatar, masthead or generic site image as an article image.
+35. Prefer a relevant article image; if unavailable, use a semantically matched fallback image or omit the image.
+36. Never invent article facts, quotations, prices, dates or people.
+37. Preserve AdSense integration and ads.txt; do not hard-code new ad slot IDs.
 `;
 
 function isAuthorized(request, env){
