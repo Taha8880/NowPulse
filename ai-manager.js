@@ -1125,11 +1125,11 @@ async function runtimeInspection(){
     try{
       const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"}); const body=await r.text();
       for(const m of body.matchAll(/\\/api\\/image\\?id=([^"'&]+)/gi))if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
-      checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
+      checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
     }catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}
   }
   for(const imagePath of imagePaths){
-    try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\\//i.test(r.headers.get("content-type")||"")});}
+    try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\//i.test(r.headers.get("content-type")||"")});}
     catch(e){checks.push({path:imagePath,status:0,ok:false,error:text(e?.message||e)});}
   }
   const home=checks.find(x=>x.path==="/?lang=ar");
@@ -1140,8 +1140,8 @@ async function runtimeInspection(){
     try{
       const r=await fetch(PRODUCTION_URL+(path.startsWith("/")?path:"/"+path),{redirect:"follow"});
       const body=await r.text();
-      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i);
-      const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\\s+/g," ").trim();
+      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
       articleChecks.push({path,status:r.status,ok:r.ok,hasArticleText:Boolean(m),length:plain.length,filler:/لا توجد معلومات متاحة|No information is available|تعذر استخراج نص المصدر|تتوفر المعلومات الحالية من المصدر المرتبط|سيعاد بناء المادة/i.test(plain)});
     }catch(e){articleChecks.push({path,status:0,ok:false,error:text(e?.message||e)});}
   }
