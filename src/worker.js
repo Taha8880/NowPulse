@@ -104,7 +104,38 @@ function between(xml,tag){const source=String(xml);const escaped=String(tag).rep
 function xmlItems(xml){const out=[];for(const block of String(xml).match(/<item\b[\s\S]*?<\/item>/gi)||[]){const title=stripHtml(between(block,"title")),link=stripHtml(between(block,"link")),date=isoDate(stripHtml(between(block,"pubDate")||between(block,"dc:date"))),description=stripHtml(between(block,"description")),source=stripHtml(between(block,"source"));const media=block.match(/<(?:media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i);const enclosure=block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);const image=media?.[1]||enclosure?.[1]||"";if(title&&link)out.push({title,link,description,source,date,originalImage:image});}return out;}
 function classify(title,category){if(category&&CATEGORIES[category])return category;const v=String(title).toLowerCase();if(/football|soccer|match|goal|premier|champions|sport|محمد صلاح|أهلي|زمالك/.test(v))return"sports";if(/stock|market|gold|oil|economy|business|bank|currency|اقتصاد|ذهب|دولار/.test(v))return"economy";if(/technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي/.test(v))return"tech";if(/health|medical|hospital|doctor|صحة|طب/.test(v))return"health";if(/movie|film|music|actor|actress|entertainment|فن|فيلم|مسلسل/.test(v))return"arts";if(/travel|tourism|flight|airport|سياحة|سفر|طيران/.test(v))return"travel";if(/president|government|election|minister|politic|رئيس|حكومة|انتخابات|سياسة/.test(v))return"politics";return"world";}
 function makeId(a){return(`${a.category}-${a.title}-${a.link}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-+|-+$/g,"").slice(0,100))+"-"+new Date(a.date).getTime();}
-function normalizeArticle(raw,category){const a={...raw};a.title=cleanText(a.title);a.description=cleanText(a.description);a.source=cleanText(a.source)||"News source";a.date=isoDate(a.date);a.category=classify(a.title,category);a.id=a.id||makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";a.image=a.originalImage||"";const rt=(a.title+" "+a.source).toLowerCase();a.region=/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(rt)?"egypt":/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(rt)?"arab":"world";return a;}
+function cleanHeadline(title){
+  let t=cleanText(title).replace(/\s+/g," ").trim();
+  t=t.replace(/\s*[-|–—]\s*(مبتدا|أهل مصر|أهل مصر نيوز|تليجراف مصر|بوابة الاقتصاد|بالبلدي|اليوم السابع|مصراوي|الشروق|الوطن|صدى البلد|القاهرة 24|العربية|الجزيرة|reuters|al jazeera|egypt today|youm7|masrawy|elwatan|akhbar elyoum)\s*$/iu,"").trim();
+  t=t.replace(/\s*[|｜]\s*[^|｜]{2,45}\s*$/u,"").trim();
+  return t;
+}
+function normalizeTitleKey(title){return cleanHeadline(title).toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim();}
+function articleSimilarity(a,b){
+  const A=new Set(normalizeTitleKey(a).split(/\s+/).filter(x=>x.length>2)),B=new Set(normalizeTitleKey(b).split(/\s+/).filter(x=>x.length>2));
+  if(!A.size||!B.size)return 0;let hit=0;for(const x of A)if(B.has(x))hit++;return hit/Math.max(1,Math.min(A.size,B.size));
+}
+function dedupeArticles(items){
+  const out=[],keys=new Set();
+  for(const a of items){
+    const key=normalizeTitleKey(a.title);if(!key||keys.has(key))continue;
+    let duplicate=false;
+    for(const x of out){if(a.link&&x.link&&a.link===x.link){duplicate=true;break;}if(articleSimilarity(a.title,x.title)>=0.78){duplicate=true;break;}}
+    if(!duplicate){keys.add(key);out.push(a);}
+  }
+  return out;
+}
+function normalizeArticle(raw,category){
+  const a={...raw};
+  a.title=cleanHeadline(a.title);a.description=cleanText(a.description);a.source=cleanText(a.source)||"News source";a.date=isoDate(a.date);
+  const detected=classify(a.title,"");
+  a.category=category==="latest"?detected:(category&&CATEGORIES[category]?category:detected);
+  if(a.category==="tech"&&!/technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي|اتصالات|هاتف|رقمي|منصة|تطبيق|روبوت|برمجيات/i.test(a.title))a.category=detected;
+  a.id=a.id||makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";a.image=a.originalImage||"";
+  const rt=(a.title+" "+a.source).toLowerCase();
+  a.region=/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(rt)?"egypt":/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(rt)?"arab":"world";
+  return a;
+}
 async function gdeltFeed(query,category="world",lang="ar"){try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(query)+"&mode=artlist&format=json&maxrecords=50&timespan=3d&sort=datedesc";const r=await timeoutFetch(u,{headers:{accept:"application/json","user-agent":"NowPulse/1.0"}},7000);if(!r.ok)return[];const d=await r.json();return(Array.isArray(d?.articles)?d.articles:[]).map(x=>normalizeArticle({title:x.title||"",link:x.url||"",description:x.description||"",source:x.domain||x.sourcecountry||"GDELT",date:x.seendate||new Date().toISOString(),originalImage:x.socialimage||""},category)).filter(a=>a.title&&a.link);}catch{return[];}}
 async function gdeltImage(title){try{const q=cleanText(title).slice(0,180);if(!q)return"";const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent('"'+q.replace(/"/g," ")+'"')+"&mode=artlist&format=json&maxrecords=12&timespan=30d&sort=datedesc";const r=await timeoutFetch(u,{headers:{accept:"application/json","user-agent":"NowPulseImageBot/1.0"}},5000);if(!r.ok)return"";const d=await r.json();for(const x of Array.isArray(d?.articles)?d.articles:[]){const u=x?.socialimage;if(validArticleImage(u))return u;}}catch{}return"";}
 async function fetchHtmlNews(url,category){try{
@@ -126,7 +157,7 @@ async function fetchHtmlNews(url,category){try{
 }catch{return[]}}
 async function fetchFeed(category,url){try{const r=await timeoutFetch(url,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":"Mozilla/5.0 NowPulse/6.1 (+https://nowpulse.tavengers16.workers.dev/)","cache-control":"no-cache"}});if(!r.ok)return[];const cutoff=Date.now()-FRESH_HOURS*3600000;return xmlItems(await r.text()).filter(x=>new Date(x.date).getTime()>=cutoff).map(x=>normalizeArticle(x,category));}catch{return[];}}
 function newsPriority(a){const t=(a.title+" "+a.source).toLowerCase();if(a.category==="politics")return 3;if(a.region==="egypt"||a.category==="egypt"||/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(t))return 100;if(a.region==="arab"||/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(t))return 50;return 0;}
-async function loadFeed(env,force=false,lang="ar"){const feedKey="feed:latest:"+lang;const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(feedKey,"json").catch(()=>null):null;if(!force&&Array.isArray(cached)&&cached.length)return cached;const feeds=lang==="en"?FEEDS_EN:FEEDS;const groups=await Promise.all(feeds.map(([cat,u])=>fetchFeed(cat,u)));const map=new Map();for(const g of groups)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);let items=[...map.values()];if(items.length<10){const direct=await Promise.all(DIRECT_FALLBACK_FEEDS.map(([cat,u])=>fetchFeed(cat,u)));for(const g of direct)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const htmlFallback=await Promise.all(["https://english.ahram.org.eg/","https://www.aljazeera.net/","https://www.aljazeera.com/"].map(u=>fetchHtmlNews(u,"world")));for(const g of htmlFallback)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const fallback=lang==="en"?await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor)","egypt","en"):await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor OR مصر OR القاهرة OR الإسكندرية)","egypt","ar");for(const a of fallback)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}items=[...map.values()].sort((a,b)=>((newsPriority(b)-newsPriority(a))*86400000+(new Date(b.date).getTime()-new Date(a.date).getTime()))).slice(0,MAX_LATEST);if(env.NOWPULSE_KV&&items.length)await env.NOWPULSE_KV.put(feedKey,JSON.stringify(items),{expirationTtl:300}).catch(()=>{});return items;}
+async function loadFeed(env,force=false,lang="ar"){const feedKey="feed:latest:"+lang;const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(feedKey,"json").catch(()=>null):null;if(!force&&Array.isArray(cached)&&cached.length)return cached;const feeds=lang==="en"?FEEDS_EN:FEEDS;const groups=await Promise.all(feeds.map(([cat,u])=>fetchFeed(cat,u)));const map=new Map();for(const g of groups)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);let items=[...map.values()];if(items.length<10){const direct=await Promise.all(DIRECT_FALLBACK_FEEDS.map(([cat,u])=>fetchFeed(cat,u)));for(const g of direct)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const htmlFallback=await Promise.all(["https://english.ahram.org.eg/","https://www.aljazeera.net/","https://www.aljazeera.com/"].map(u=>fetchHtmlNews(u,"world")));for(const g of htmlFallback)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const fallback=lang==="en"?await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor)","egypt","en"):await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor OR مصر OR القاهرة OR الإسكندرية)","egypt","ar");for(const a of fallback)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}items=dedupeArticles([...map.values()]).sort((a,b)=>((newsPriority(b)-newsPriority(a))*86400000+(new Date(b.date).getTime()-new Date(a.date).getTime()))).slice(0,MAX_LATEST);if(env.NOWPULSE_KV&&items.length)await env.NOWPULSE_KV.put(feedKey,JSON.stringify(items),{expirationTtl:300}).catch(()=>{});return items;}
 async function loadCategoryFeed(env,category,lang="ar"){
   if(!CATEGORIES[category]||category==="latest")return[];
   const feeds=lang==="en"?FEEDS_EN:FEEDS;
@@ -285,7 +316,7 @@ function htmlArticleText(html){
 }
 async function sourceEvidence(article,env,lang="ar"){const evidence=[];if(article.description)evidence.push("FEED DESCRIPTION:\n"+article.description);try{const r=await timeoutFetch(article.link,{redirect:"follow",headers:{"user-agent":"Mozilla/5.0 NowPulse/7.0","accept":"text/html,application/xhtml+xml,text/plain"}},9000);if(r.ok){const t=htmlArticleText(await r.text());if(t.length>=500)evidence.push("PRIMARY PAGE EXTRACT:\n"+t.slice(0,14000));}}catch{}try{const ext=await externalSearchEvidence(env,article.title,lang);const rel=ext.results.filter(x=>x.link&&x.link!==article.link).slice(0,8);if(rel.length)evidence.push("INDEPENDENT EXTERNAL COVERAGE:\n"+rel.map(x=>x.source+" | "+x.title+"\n"+(x.description||"")+"\n"+(x.link||"")).join("\n\n"));}catch{}return evidence.join("\n\n").slice(0,26000)}
 async function writeArticle(env,article,related,lang="ar"){
-  const cacheKey="article:v5:"+lang+":"+article.id;
+  const cacheKey="article:v6:"+lang+":"+article.id;
   if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(cacheKey).catch(()=>null);if(cached&&cached.length>600)return cached;}
   const evidence=await sourceEvidence(article,env,lang);
   if(!env.AI)return fallbackArticle(article,evidence);
@@ -459,50 +490,31 @@ footer{border-top:1px solid var(--np-border);color:var(--np-muted)}
 function homeBody(items,lang,category,marketData,weatherData){const filtered=category&&category!=="latest"?(category==="egypt"?items.filter(a=>a.region==="egypt"):items.filter(a=>a.category===category)):items;const list=category&&category!=="latest"?filtered:items;const featured=list[0],rest=list.slice(1,30),quoteIndex=Math.floor(Date.now()/30000)%QUOTES.length;const market=`<section class="panel"><h3>💹 ${lang==="ar"?"الأسواق والأسعار":"Markets & Prices"}</h3><div class="market-grid"><b>USD/EGP<br><span id="m-usd">${marketData.usdEgp?marketData.usdEgp.toFixed(2):"—"}</span></b><b>EUR/EGP<br><span id="m-eur">${marketData.eurEgp?marketData.eurEgp.toFixed(2):"—"}</span></b><b>GBP/EGP<br><span id="m-gbp">${marketData.gbpEgp?marketData.gbpEgp.toFixed(2):"—"}</span></b><b>CHF/EGP<br><span id="m-chf">${marketData.chfEgp?marketData.chfEgp.toFixed(2):"—"}</span></b><b>ذهب 24K<br><span id="m-g24">${marketData.gold24k?marketData.gold24k.toFixed(2):"—"}</span></b><b>ذهب 21K<br><span id="m-g21">${marketData.gold21k?marketData.gold21k.toFixed(2):"—"}</span></b><b>ذهب 18K<br><span id="m-g18">${marketData.gold18k?marketData.gold18k.toFixed(2):"—"}</span></b></div><div class="updated-line" id="markets-updated">${lang==="ar"?"تحديث":"Updated"}: ${marketData.updated?new Date(marketData.updated).toLocaleTimeString(lang==="ar"?"ar-EG":"en-US",{hour:"2-digit",minute:"2-digit"}):"—"}</div></section>`;const weatherLabel=(code)=>{const m={0:["صافي","Clear"],1:["غائم جزئيًا","Mainly clear"],2:["غائم جزئيًا","Partly cloudy"],3:["غائم","Overcast"],45:["ضباب","Fog"],48:["ضباب","Rime fog"],51:["رذاذ خفيف","Light drizzle"],53:["رذاذ","Drizzle"],55:["رذاذ كثيف","Dense drizzle"],61:["أمطار خفيفة","Light rain"],63:["أمطار","Rain"],65:["أمطار غزيرة","Heavy rain"],71:["ثلوج خفيفة","Light snow"],73:["ثلوج","Snow"],75:["ثلوج غزيرة","Heavy snow"],80:["زخات مطر","Rain showers"],81:["زخات مطر","Rain showers"],82:["زخات مطر غزيرة","Heavy rain showers"],95:["عواصف رعدية","Thunderstorm"],96:["عاصفة رعدية وبَرَد","Thunderstorm with hail"],99:["عاصفة رعدية وبَرَد","Thunderstorm with hail"]};return m[Number(code)]?.[lang==="ar"?0:1]||""};const weatherBox=`<section class="panel weather-panel"><div class="weather-head"><h3><span class="weather-icon" aria-hidden="true">🌤</span> ${lang==="ar"?"الطقس":"Weather"}</h3><span>${esc(lang==="ar"?"القاهرة":"Cairo")}</span></div><div class="weather-main">${weatherData.temperature==null?"—":Number(weatherData.temperature).toFixed(1)+"°C"} <small>${weatherData.humidity==null?"": " · "+weatherData.humidity+"%"}</small></div><div class="weather-desc">${esc(weatherLabel(weatherData.code))}</div><div class="updated-line">${lang==="ar"?"يتحدث تلقائيًا":"Auto-updated"}</div></section>`;return`<section class="hero"><div><div class="eyebrow">${icon(category||"latest")}</div><h1>${esc(category?CATEGORIES[category]?.[lang]||CATEGORIES.latest[lang]:CATEGORIES.latest[lang])}</h1></div><div class="quote" id="quote" data-i="${quoteIndex}">${esc(QUOTES[quoteIndex][lang])}</div></section><div class="dashboard">${market}${weatherBox}</div>${list.length?`<section class="news-grid">${list.slice(0,30).map((a,i)=>card(a,lang,i===0)).join("")}</section>`:`<div class="empty">${lang==="ar"?"لا توجد أخبار حديثة في هذا القسم حاليًا.":"No recent stories are available in this section."}</div>`}`;}
 function articleBody(a,body,l,related=[]){
   const raw=String(body||"").replace(/\r/g,"").trim();
-  const blocks=raw.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-  const parts=[];
+  const blocks=raw.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean),parts=[];
   for(const block of blocks){
-    const lines=block.split("\n").map(x=>x.trim()).filter(Boolean);
-    if(!lines.length)continue;
+    const lines=block.split("\n").map(x=>x.trim()).filter(Boolean);if(!lines.length)continue;
     const first=lines[0];
-    if(/^#{1,3}\s+/.test(first)){
-      parts.push({type:"heading",text:first.replace(/^#{1,3}\s+/,"").trim()});
-      const rest=lines.slice(1).join(" ").trim();
-      if(rest)parts.push({type:"p",text:rest});
-    }else{
-      parts.push({type:"p",text:lines.join(" ").trim()});
-    }
+    if(/^#{1,3}\s+/.test(first)){const h=first.replace(/^#{1,3}\s+/,"").trim();if(h&&!/^(المصادر|المصدر|sources?|references?)$/i.test(h))parts.push({type:"heading",text:h});const rest=lines.slice(1).join(" ").trim();if(rest)parts.push({type:"p",text:rest});}
+    else parts.push({type:"p",text:lines.join(" ").trim()});
   }
-  const paras=parts.filter(x=>x.type==="p");
-  const lead=(a.description||paras[0]?.text||a.title||"").trim();
+  const paragraphs=parts.filter(x=>x.type==="p"),lead=(a.description||paragraphs[0]?.text||a.title||"").trim();
   const image=validArticleImage(a.image)?a.image:"/api/image?id="+encodeURIComponent(a.id);
-  const rendered=[];
-  let paragraphIndex=0;
-  for(const part of parts){
-    if(part.type==="heading"){
-      rendered.push("<h2>"+esc(part.text)+"</h2>");
-    }else{
-      const cls=paragraphIndex===0?"article-lead":"";
-      rendered.push("<p"+(cls?' class="article-lead"':"")+">"+esc(part.text)+"</p>");
-      paragraphIndex++;
-    }
-  }
+  const rendered=[];let pi=0;
+  for(const part of parts){if(part.type==="heading")rendered.push("<h2>"+esc(part.text)+"</h2>");else{const cls=pi===0?' class="article-lead"':"";rendered.push("<p"+cls+">"+esc(part.text)+"</p>");pi++;}}
   if(!rendered.length)rendered.push('<p class="article-lead">'+esc(lead)+'</p>');
-  const relatedItems=(related||[]).filter(x=>x&&x.id!==a.id).slice(0,5);
-  const location=a.location||a.city||"";
+  const relatedItems=dedupeArticles((related||[]).filter(x=>x&&x.id!==a.id)).slice(0,4);
   const published=a.date?new Date(a.date):null;
   const dateText=published&&!Number.isNaN(published.getTime())?published.toLocaleString(l==="ar"?"ar-EG":"en-US",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):"";
-  const relatedHtml=relatedItems.length?'<section class="article-related"><h2>'+ (l==="ar"?"اقرأ أيضًا":"Read also") +'</h2><div class="article-related-list">'+relatedItems.map(x=>'<a href="/article/'+encodeURIComponent(x.id)+'?lang='+l+'"><span>'+esc(x.title)+'</span><small>'+esc(x.source||"NowPulse")+' · '+ageLabel(x.date,l)+'</small></a>').join("")+'</div></section>':"";
+  const relatedHtml=relatedItems.length?'<section class="article-related"><h2>'+ (l==="ar"?"أخبار مرتبطة":"Related news") +'</h2><div class="article-related-list">'+relatedItems.map(x=>'<a href="/article/'+encodeURIComponent(x.id)+'?lang='+l+'"><span>'+esc(x.title)+'</span><small>'+ageLabel(x.date,l)+'</small></a>').join("")+'</div></section>':"";
   return '<article class="article" dir="'+(l==="ar"?"rtl":"ltr")+'">'+
     '<div class="article-kicker"><span class="category-icon">'+icon(a.category)+'</span><span>'+esc(CATEGORIES[a.category]?.[l]||"News")+'</span></div>'+
     '<h1>'+esc(a.title)+'</h1>'+
     (lead?'<p class="article-dek">'+esc(lead)+'</p>':"")+
-    '<div class="article-meta"><span>'+esc(a.source||"NowPulse")+'</span>'+(location?'<span>•</span><span>'+esc(location)+'</span>':"")+(dateText?'<span>•</span><time datetime="'+esc(a.date)+'">'+esc(dateText)+'</time>':"")+'</div>'+
-    '<div class="article-share" aria-label="'+(l==="ar"?"مشاركة":"Share")+'"><button type="button" onclick="navigator.clipboard?.writeText(location.href)">'+(l==="ar"?"نسخ رابط المقال":"Copy link")+'</button></div>'+
-    '<figure class="article-figure"><img class="article-image" src="'+esc(image)+'" loading="eager" width="1200" height="750" alt="'+esc(a.title)+'"><figcaption>'+esc((l==="ar"?"صورة مرتبطة بالموضوع — المصدر: ":"Story image — source: ")+(a.source||"NowPulse"))+'</figcaption></figure>'+
-    '<div class="article-body">'+rendered.join("")+'</div>'+
-    relatedHtml+
-    '<div class="article-updated">'+(l==="ar"?"آخر تحديث للمادة":"Article update")+': '+esc(new Date().toLocaleString(l==="ar"?"ar-EG":"en-US",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}))+'</div>'+
+    (dateText?'<div class="article-meta"><time datetime="'+esc(a.date)+'">'+esc(dateText)+'</time></div>':"")+
+    '<div class="article-share" aria-label="'+(l==="ar"?"أدوات المقال":"Article tools")+'"><button type="button" onclick="navigator.clipboard?.writeText(location.href)">'+(l==="ar"?"نسخ الرابط":"Copy link")+'</button></div>'+
+    '<figure class="article-figure"><img class="article-image" src="'+esc(image)+'" loading="eager" width="1200" height="750" alt="'+esc(a.title)+'"><figcaption>'+esc(l==="ar"?"صورة توضيحية للخبر":"Illustrative image")+'</figcaption></figure>'+
+    '<div class="article-body">'+rendered.join("")+'</div>'+relatedHtml+
+    '<div class="article-updated">'+(l==="ar"?"آخر تحديث للمادة":"Last updated")+': '+esc(new Date().toLocaleString(l==="ar"?"ar-EG":"en-US",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}))+'</div>'+
     '</article>';
 }
 const CSS=`\n.weather-panel{min-width:0}.weather-head h3{display:flex;align-items:center;gap:6px;margin:0;font-size:16px}.weather-icon{font-size:20px;line-height:1;display:inline-flex;align-items:center}.weather-main{font-size:26px;font-weight:800;line-height:1.2;margin-top:8px}.weather-main small{font-size:14px;font-weight:600;color:var(--muted)}.weather-desc{font-size:13px;color:var(--muted);margin-top:3px}.article-content-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}.article-text h2{font-size:21px;margin:26px 0 8px;color:var(--text);border-inline-start:4px solid var(--accent);padding-inline-start:10px}.article-text p{margin:0 0 16px}.article-image{display:block;width:100%;max-height:650px;object-fit:cover;border-radius:16px;background:#eef2f6;margin:16px 0 20px}.article-image[style*="display: none"]{display:none!important}.story-hub{margin:18px 0}.weather-panel .updated-line{font-size:11px;margin-top:6px}.dashboard{align-items:stretch}\n
