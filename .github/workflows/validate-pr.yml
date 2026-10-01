@@ -57,6 +57,8 @@ jobs:
           grep -q 'google.com, pub-1235197294708204' src/worker.js
           grep -q '@cf/zai-org/glm-5.2' ai-manager.js
           grep -q '@cf/meta/llama-3.1-8b-instruct-fast' ai-manager.js
+          grep -q 'const VERSION = "10.1.0"' ai-manager.js
+          grep -q '*/15 * * * *' ai-manager.wrangler.jsonc
           if grep -q 'const category=url.searchParams.get("category")||"latest",items=await loadFeed(env,false,lang),enriched=' src/worker.js; then
             echo 'Homepage must not block on bulk image enrichment.'
             exit 1
