@@ -1,4 +1,5 @@
 import { NowPulseGuardian } from "./ai-guardian.js";
+import { getAgentByName } from "agents";
 import { NowPulseMaintenanceWorkflow } from "./nowpulse-maintenance-workflow.js";
 const VERSION = "6.1.0";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
@@ -116,7 +117,7 @@ async function extractImage(article){
   const gd=await gdeltImage(article.title);if(validArticleImage(gd))return gd;
   const semantic=await wikipediaImage(article.title);if(validArticleImage(semantic))return semantic;
   const commons=await wikimediaImage(article.title);if(validArticleImage(commons))return commons;
-  return validArticleImage(article.originalImage)?article.originalImage:"";
+  return "";
 }
 async function enrichImages(env,items){
   const list=Array.isArray(items)?items:[];
@@ -222,7 +223,7 @@ function ageLabel(d,l){const m=Math.max(0,Math.floor((Date.now()-new Date(d).get
 function icon(c){return{sports:"⚽",economy:"📈",politics:"🏛️",tech:"⚡",arts:"🎬",health:"🩺",travel:"✈️",egypt:"🇪🇬",world:"🌍",trends:"🔥",latest:"📰"}[c]||"📰";}
 function articleUrl(a,l){return"/article/"+encodeURIComponent(a.id)+"?lang="+l;}
 function card(a,l,featured=false){const image="/api/image?id="+encodeURIComponent(a.id);return`<article class="card ${featured?"featured":""}"><a class="card-image" href="${articleUrl(a,l)}"><img src="${esc(image)}" loading="${featured?"eager":"lazy"}" decoding="async" width="900" height="560" alt="${esc(a.title)}" onerror="this.closest('.card-image').style.display='none'"></a><div class="card-body"><div class="meta"><span class="category-icon">${icon(a.category)}</span><span>${esc(CATEGORIES[a.category]?.[l]||CATEGORIES.world[l])}</span><span>•</span><span>${ageLabel(a.date,l)}</span></div><h2><a href="${articleUrl(a,l)}">${esc(a.title)}</a></h2><p>${esc(a.description||a.title)}</p><div class="source">${esc(a.source)}</div></div></article>`;}
-async function aiStatus(env){if(!env.NOWPULSE_KV)return {ok:false,configured:false,service:"NowPulse AI Guardian"};try{const raw=await env.NOWPULSE_KV.get("ai:guardian:status");return {ok:true,configured:true,service:"NowPulse AI Guardian",mode:"autonomous",schedule:"every 15 minutes",...(raw?JSON.parse(raw):{status:"waiting"})};}catch(e){return {ok:false,configured:true,error:String(e?.message||e)};}}
+async function aiStatus(env){try{if(env.NowPulseGuardian){const agent=await getAgentByName(env.NowPulseGuardian,"primary");const state=await agent.getStatus();return {ok:true,configured:true,service:"NowPulse AI Guardian",mode:"autonomous",schedule:"every 15 minutes",...state};}}catch(e){console.error("AI Guardian status read failed",e?.message||e);}if(env.NOWPULSE_KV){try{const raw=await env.NOWPULSE_KV.get("ai:guardian:status");return {ok:true,configured:true,service:"NowPulse AI Guardian",mode:"autonomous",schedule:"every 15 minutes",...(raw?JSON.parse(raw):{status:"waiting"})};}catch(e){return {ok:false,configured:true,error:String(e?.message||e)};}}return {ok:false,configured:false,service:"NowPulse AI Guardian",status:"unavailable"};}
 function envAdsense(lang){
   const client="ca-pub-1235197294708204";
   return '<meta name="google-adsense-account" content="'+client+'"><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client='+client+'" crossorigin="anonymous"></script>';
