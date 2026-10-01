@@ -1,9 +1,10 @@
-const VERSION = "9.1.0";
+const VERSION = "10.0.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
 const WORKER_FILE = "src/worker.js";
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const AI_MODEL = "@cf/zai-org/glm-5.2";
+const AI_FALLBACK_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const PRODUCTION_URL = "https://nowpulse.tavengers16.workers.dev";
 
 const ALLOWED_REPAIR_FILES = new Set([
