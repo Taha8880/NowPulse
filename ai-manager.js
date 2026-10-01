@@ -1634,8 +1634,6 @@ async function health(env) {
       "safe",
     ai:
       Boolean(env.AI),
-    github:
-      Boolean(env.GITHUB_TOKEN),
     repository: REPOSITORY,
     branch: DEFAULT_BRANCH,
     workerFile: WORKER_FILE,
@@ -1792,29 +1790,19 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    if (
-      env.NOWPULSE_AI_REPAIR_MODE !==
-      "safe"
-    ) {
-      return;
-    }
+    const mode = env.NOWPULSE_AI_REPAIR_MODE || "safe";
 
-    /*
-     * Safe mode performs inspection only.
-     *
-     * It does NOT automatically create a branch,
-     * commit or pull request from the scheduled job.
-     *
-     * This prevents an incorrect inspection from
-     * modifying production code automatically.
-     */
     try {
-      await inspectProject(env);
-    } catch {
-      /*
-       * Scheduled inspection must never crash
-       * the Worker because of a diagnostic failure.
-       */
+      if (mode === "auto") {
+        await runRepair(env);
+        return;
+      }
+
+      if (mode === "safe") {
+        await inspectProject(env);
+      }
+    } catch (error) {
+      console.error("Scheduled AI maintenance failed", error?.stack || error);
     }
   }
 };
