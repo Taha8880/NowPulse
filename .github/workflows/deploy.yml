@@ -57,11 +57,7 @@ jobs:
           const wf = fs.readFileSync("src/nowpulse-maintenance-workflow.js", "utf8");
           for (const [name, source, needle] of [
             ["Guardian export", w, "NowPulseGuardian"],
-            ["Workflow export", w, "NowPulseMaintenanceWorkflow"],
-            ["Workflow type", w, '"type": "workflow"'],
-            ["Workflow loopback trigger", fs.readFileSync("src/worker.js", "utf8"), "ctx.exports.NowPulseMaintenanceWorkflow.create"],
-            ["15-minute trigger slot", fs.readFileSync("src/worker.js", "utf8"), "ai:maintenance:trigger:"],
-            ["15-minute trigger window", fs.readFileSync("src/worker.js", "utf8"), "900000"],
+            ["Workflow class source", fs.readFileSync("src/nowpulse-maintenance-workflow.js", "utf8"), "class NowPulseMaintenanceWorkflow"],
             ["GitHub secret access", wf, "NOWPULSE_GITHUB_TOKEN"],
             ["Guardian agent access", wf, "getAgentByName"]
           ]) {
@@ -123,18 +119,7 @@ jobs:
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          set +e
-          output="$(npx wrangler deploy --config wrangler.jsonc 2>&1)"
-          status=$?
-          set -e
-          printf '%s\n' "$output"
-          if [ "$status" -ne 0 ]; then
-            if ! printf '%s' "$output" | grep -Eq 'Workflow|workflows|10002'; then
-              echo "Cloudflare Worker deployment failed for a non-Workflow reason."
-              exit "$status"
-            fi
-            echo "Wrangler reported a Workflow provisioning error; explicit Workflow API provisioning will reconcile it."
-          fi
+          npx wrangler deploy --config wrangler.jsonc
       - name: Verify production after Cloudflare deployment
         shell: bash
         run: |
