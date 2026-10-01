@@ -40,25 +40,57 @@ jobs:
           node -e "
           const fs = require('fs');
           const text = fs.readFileSync('ai-manager.wrangler.jsonc', 'utf8');
-          JSON.parse(text);
-          console.log('ai-manager.wrangler.jsonc is valid JSON');
+          const config = JSON.parse(text);
+
+          if (config.name !== 'nowpulse-ai-manager') {
+            throw new Error('Wrong Worker name');
+          }
+
+          if (config.main !== 'ai-manager.js') {
+            throw new Error('Wrong Worker main file');
+          }
+
+          if (!config.ai || config.ai.binding !== 'AI') {
+            throw new Error('Workers AI binding is missing');
+          }
+
+          if (
+            !config.vars ||
+            config.vars.NOWPULSE_GITHUB_REPO !== 'Taha8880/NowPulse'
+          ) {
+            throw new Error('GitHub repository configuration is missing');
+          }
+
+          if (
+            !config.secrets ||
+            !Array.isArray(config.secrets.required) ||
+            !config.secrets.required.includes('GITHUB_TOKEN')
+          ) {
+            throw new Error('GITHUB_TOKEN must be declared as a required secret');
+          }
+
+          console.log('AI Manager Wrangler configuration is valid');
           "
 
-      - name: Check required AI Manager configuration
-        run: |
-          grep -q '"name": "nowpulse-ai-manager"' ai-manager.wrangler.jsonc
-          grep -q '"main": "ai-manager.js"' ai-manager.wrangler.jsonc
-          grep -q '"binding": "AI"' ai-manager.wrangler.jsonc
-          grep -q '"NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse"' ai-manager.wrangler.jsonc
-
       - name: Deploy AI Manager
-        run: npx wrangler deploy --config ai-manager.wrangler.jsonc
+        run: |
+          npx wrangler deploy --config ai-manager.wrangler.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify AI Manager
+      - name: Verify deployment
         run: |
           sleep 5
+
+          echo "Checking AI Manager health..."
           curl --fail --silent --show-error \
             https://nowpulse-ai-manager.tavengers16.workers.dev/health
+
+          echo ""
+          echo "Checking GitHub token..."
+          curl --fail --silent --show-error \
+            https://nowpulse-ai-manager.tavengers16.workers.dev/github-test
+
+          echo ""
+          echo "AI Manager deployment verification completed."
