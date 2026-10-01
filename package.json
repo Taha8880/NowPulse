@@ -1,7 +1,7 @@
 {
   "name": "nowpulse",
   "private": true,
-  "version": "5.7.1",
+  "version": "5.8.0",
   "engines": {
     "node": ">=22"
   },
@@ -9,7 +9,10 @@
     "wrangler": "^4.0.0"
   },
   "scripts": {
-    "check": "node --check src/worker.js && node --check ai-manager.js",
+    "check": "node --check src/worker.js && node --check src/ai-guardian.js && node --check src/nowpulse-maintenance-workflow.js && node --check ai-manager.js",
     "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "agents": "^0.24.0"
   }
 }

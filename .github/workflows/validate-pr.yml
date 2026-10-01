@@ -24,10 +24,21 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
       - name: Validate JavaScript syntax
         run: |
           node --check src/worker.js
+          node --check src/ai-guardian.js
+          node --check src/nowpulse-maintenance-workflow.js
           node --check ai-manager.js
+
+      - name: Validate Wrangler configuration
+        run: npx wrangler deploy --dry-run --config wrangler.jsonc
+
+      - name: Validate package scripts
+        run: npm run check
 
       - name: Validate required files
         run: |
@@ -35,6 +46,8 @@ jobs:
           test -f wrangler.jsonc
           test -f ai-manager.js
           test -f ai-manager.wrangler.jsonc
+          test -f src/ai-guardian.js
+          test -f src/nowpulse-maintenance-workflow.js
 
       - name: Validate required architecture
         run: |
@@ -45,6 +58,9 @@ jobs:
           grep -q 'Created by Taha' src/worker.js
           grep -q 'binding' wrangler.jsonc
           grep -q 'binding' ai-manager.wrangler.jsonc
+          grep -q 'NowPulseGuardian' wrangler.jsonc
+          grep -q 'NowPulseMaintenanceWorkflow' wrangler.jsonc
+          grep -q 'nodejs_compat' wrangler.jsonc
 
       - name: Validate ads.txt implementation
         run: |

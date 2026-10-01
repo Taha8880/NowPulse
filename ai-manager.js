@@ -1194,7 +1194,7 @@ async function runtimeInspection(){
   for(const path of paths){
     try{
       const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"}); const body=await r.text();
-      for(const m of body.matchAll(/\\/api\\/image\\?id=([^"'&]+)/gi))if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
+      for(const m of body.matchAll(/\/api\/image\?id=([^"'&]+)/gi))if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
       checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
     }catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}
   }
@@ -1204,7 +1204,7 @@ async function runtimeInspection(){
   }
   const home=checks.find(x=>x.path==="/?lang=ar");
   const articleLinks=[];
-  if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\\/article\\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
+  if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\/article\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
   const articleChecks=[];
   for(const path of articleLinks){
     try{
