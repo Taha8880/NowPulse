@@ -1,4 +1,4 @@
-name: NowPulse CI
+name: NowPulse Production
 on:
   push:
     branches: [main]
@@ -25,27 +25,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config wrangler.jsonc
-      - name: Install GitHub token
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
-        run: printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config wrangler.jsonc
       - name: Verify production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -e
           base=https://nowpulse.tavengers16.workers.dev
-          ok=0
           for i in $(seq 1 18); do
             h=$(curl -fsSL --max-time 15 "$base/health" || true)
             echo "$h"
-            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"7.0.0"'; then ok=1; break; fi
+            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"9.0.0"'; then break; fi
+            if [ "$i" = "18" ]; then exit 1; fi
             sleep 5
           done
-          test "$ok" = 1
-          curl -fsSL "$base/api/news" | grep -q '\['
+          curl -fsSL "$base/api/news" | grep -q '"'
           curl -fsSL "$base/api/markets" | grep -q 'usdEgp'
+          curl -fsSL "$base/api/weather?city=cairo" | grep -q 'temperature'
+          curl -fsSL "$base/robots.txt" | grep -q 'Sitemap'
           curl -fsSL "$base/sitemap.xml" | grep -q '<urlset'
-# Stability trigger: validate and deploy the restored v7 baseline.
