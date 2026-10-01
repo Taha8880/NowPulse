@@ -18,6 +18,7 @@ jobs:
           code=$(curl -L -s -o /tmp/home -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/)
           test "$code" = "200"
           grep -q 'NowPulse' /tmp/home
+          grep -q '6.1.0' /tmp/home
 
       - name: Check health
         run: |
@@ -32,6 +33,8 @@ jobs:
           test "$code" = "200"
           grep -q 'usdEgp' /tmp/markets
           grep -q 'gold21k' /tmp/markets
+          grep -q 'gold24k' /tmp/markets
+          grep -q 'gold18k' /tmp/markets
 
       - name: Check ads.txt
         run: |
@@ -53,6 +56,13 @@ jobs:
           code=$(curl -L -s -o /tmp/search -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/search?q=Google&lang=en')
           test "$code" = "200"
           grep -q 'NowPulse' /tmp/search
+
+      - name: Check English search
+        run: |
+          set -e
+          code=$(curl -L -s -o /tmp/search-en -w '%{http_code}' --max-time 20 'https://nowpulse.tavengers16.workers.dev/search?q=Egypt&lang=en')
+          test "$code" = "200"
+          grep -q 'NowPulse' /tmp/search-en
 
       - name: Healthy
         run: echo 'NowPulse production monitoring passed.'
