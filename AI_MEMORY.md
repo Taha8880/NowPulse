@@ -71,3 +71,9 @@ The AI is expected to inspect the complete product on schedule without waiting f
 - Durable Agent + Workflow control plane was introduced in v5.8.0.
 - GitHub validation now includes dependency installation, JavaScript syntax, Wrangler dry-run and production smoke tests.
 - The current objective is a continuously improving production platform, not a one-time bug fix.
+
+## New product innovation: TimeShift
+- NowPulse articles can remember a reader's saved version locally in the browser and show what changed when the reader returns.
+- The feature is privacy-preserving: the snapshot remains in localStorage and is not uploaded.
+- Preserve the TimeShift UX and its purpose: transform an article from a static page into a time-aware object that answers "what changed since I last read this?" without forcing the reader to reread the whole story.
+- Future AI improvements should extend this concept toward reliable story evolution, but must not invent changes or claim that a change occurred without evidence.
