@@ -120,8 +120,8 @@ Core requirements:
 52. Self-improvement means improving the maintenance system using evidence from previous audits; it does not mean changing safety gates to make repairs easier.
 53. A repair cycle is not complete merely because a PR was created. Completion requires repository validation and a subsequent production verification cycle after merge.
 54. If validation fails, the next cycle must inspect the failure and repair the actual cause rather than repeatedly applying the same change.
-55. The durable Guardian agent and maintenance Workflow are part of the core control plane; preserve their bindings, exports, schedules, state lock and post-deploy verification.
-56. When the Agent/Workflow architecture is healthy, do not replace it with a simpler cron-only repair loop.
+55. The durable Guardian agent and maintenance Workflow are part of the core control plane; preserve the Guardian binding, Workflow class, explicit Cloudflare Workflow provisioning, GitHub-triggered maintenance schedule, state lock and post-deploy verification.
+56. When the Agent/Workflow architecture is healthy, do not replace it with a simpler repair loop. Worker cron is reserved for news ingestion; maintenance Workflow triggering is coordinated through GitHub Actions and the Cloudflare Workflows API.
 
 
 AUTONOMOUS_PRODUCT_VISION:
