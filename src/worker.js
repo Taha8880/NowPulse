@@ -132,16 +132,16 @@ function relatedFor(article,items){const stop=new Set(["من","في","على","�
 function htmlArticleText(html){
   const src=String(html||"");
   const bodies=[];
-  for(const m of src.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
+  for(const m of src.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
     try{
       const d=JSON.parse(m[1].trim());
       const arr=Array.isArray(d)?d:[d];
       for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
     }catch{}
   }
-  const p=[...src.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
+  const p=[...src.matchAll(/<p\b[^>]*>([\\s\\S]*?)<\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
   bodies.push(p.join("\\n"));
-  for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
+  for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
   return bodies.map(cleanText).sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
 }
 async function sourceEvidence(article){
@@ -174,7 +174,7 @@ Write the finished article now. Every factual claim must be grounded in the supp
   try{
     let out=aiText(await env.AI.run(AI_MODEL,prompt)).trim();
     if(out.length<700)out=aiText(await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",prompt)).trim();
-    out=out.replace(/\\r/g,"").replace(/^\`\`\`[a-z]*\\s*/i,"").replace(/\\s*\`\`\`$/,"").replace(/^#+\\s*/gm,"").replace(/^[-*•]\\s+/gm,"").trim();
+    out=out.replace(/\r/g,"").replace(/^\`\`\`[a-z]*\s*/i,"").replace(/\s*\`\`\`$/,"").replace(/^#+\s*/gm,"").replace(/^[-*•]\s+/gm,"").trim();
     if(out.length<700)throw Error("AI article output too short");
     if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(cacheKey,out,{expirationTtl:21600}).catch(()=>{});
     return out;
