@@ -250,9 +250,15 @@ function fallbackArticle(a,evidence=""){
 }
 async function searchNews(env,q,lang="ar"){q=cleanText(q).slice(0,120);if(!q)return[];const key="search:v6:"+lang+":"+q.toLowerCase();if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(key,"json").catch(()=>null);if(Array.isArray(cached)&&cached.length)return cached;}const latest=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:latest:"+lang,"json").catch(()=>[]):[];const archive=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:archive:"+lang,"json").catch(()=>[]):[];const normalizeSearch=s=>cleanText(s).toLowerCase().normalize("NFKD").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[إأآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();const terms=normalizeSearch(q).split(/\\s+/).filter(t=>t.length>1);const matches=a=>{const hay=normalizeSearch((a.title||"")+" "+(a.description||"")+" "+(a.source||""));return terms.length>0&&terms.every(t=>hay.includes(t))};const local=[...(Array.isArray(latest)?latest:[]),...(Array.isArray(archive)?archive:[])].filter(matches);let remote=[];try{remote=await gdeltFeed(lang==="en"?q:"("+q+")","world",lang);remote=remote.filter(matches);}catch{}const urls=lang==="en"?["https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:14d")+"&hl=en&gl=EG&ceid=EG:en"]:["https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:14d")+"&hl=ar&gl=EG&ceid=EG:ar"];const groups=await Promise.all(urls.map(async u=>{try{const r=await timeoutFetch(u,{headers:{accept:"application/rss+xml, application/xml, text/xml"}},7000);return r.ok?xmlItems(await r.text()).map(x=>normalizeArticle(x,"world")).filter(matches):[]}catch{return[]}}));const m=new Map();for(const a of [...local,...remote,...groups.flat()]){const k=a.link||a.title;if(!m.has(k))m.set(k,a);}const result=[...m.values()].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,40);if(env.NOWPULSE_KV&&result.length){await env.NOWPULSE_KV.put(key,JSON.stringify(result),{expirationTtl:60}).catch(()=>{});for(const a of result)await env.NOWPULSE_KV.put("article:"+a.id,JSON.stringify(a),{expirationTtl:604800}).catch(()=>{});}return result;}
 async function markets(env){
-  const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("markets:v3","json").catch(()=>null):null;
+  const cacheKey="markets:v3";
+  const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(cacheKey,"json").catch(()=>null):null;
+  const cachedAt=Date.parse(cached?.fetchedAt||cached?.updated||"");
+  if(cached&&Number.isFinite(cachedAt)&&Date.now()-cachedAt<60000){
+    return cached;
+  }
   let usdEgp=0,eurEgp=0,gbpEgp=0,chfEgp=0,gold24k=0,gold21k=0,gold18k=0,ratesDate=null,goldUpdated=null;
   const provider={fx:false,gold:false,fxSource:"",goldSource:""};
+  let fxFetchedAt=null,goldFetchedAt=null;
   try{
     const r=await timeoutFetch("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,CHF",{headers:{accept:"application/json","cache-control":"no-cache"}},7000);
     if(r.ok){
@@ -263,8 +269,8 @@ async function markets(env){
       gbpEgp=usdEgp&&rates.GBP?usdEgp/rates.GBP:0;
       chfEgp=usdEgp&&rates.CHF?usdEgp/rates.CHF:0;
       ratesDate=(Array.isArray(rows)?rows:[]).map(x=>x.date).filter(Boolean).sort().pop()||null;
-      provider.fx=Boolean(usdEgp||eurEgp||gbpEgp);
-      if(provider.fx)provider.fxSource="frankfurter";
+      provider.fx=Boolean(usdEgp&&eurEgp&&gbpEgp);
+      if(provider.fx){provider.fxSource="frankfurter";fxFetchedAt=new Date().toISOString();}
     }
   }catch{}
   if(!provider.fx){
@@ -278,8 +284,8 @@ async function markets(env){
         gbpEgp=usdEgp&&Number(rates.GBP)?usdEgp/Number(rates.GBP):0;
         chfEgp=usdEgp&&Number(rates.CHF)?usdEgp/Number(rates.CHF):0;
         ratesDate=d?.time_last_update_utc||null;
-        provider.fx=Boolean(usdEgp||eurEgp||gbpEgp);
-        if(provider.fx)provider.fxSource="open-er-api";
+        provider.fx=Boolean(usdEgp&&eurEgp&&gbpEgp);
+        if(provider.fx){provider.fxSource="open-er-api";fxFetchedAt=new Date().toISOString();}
       }
     }catch{}
   }
@@ -291,8 +297,8 @@ async function markets(env){
       gold21k=Number(gd.price_gram_21k)||0;
       gold18k=Number(gd.price_gram_18k)||0;
       goldUpdated=gd.timestamp||null;
-      provider.gold=Boolean(gold24k||gold21k||gold18k);
-      if(provider.gold)provider.goldSource="goldprice.dev";
+      provider.gold=Boolean(gold24k&&gold21k&&gold18k);
+      if(provider.gold){provider.goldSource="goldprice.dev";goldFetchedAt=new Date().toISOString();}
     }
   }catch{}
   if(!provider.gold){
@@ -308,6 +314,7 @@ async function markets(env){
           goldUpdated=gd?.updated_at||gd?.data_state?.as_of||null;
           provider.gold=true;
           provider.goldSource="xaus";
+          goldFetchedAt=new Date().toISOString();
         }
       }
     }catch{}
@@ -320,7 +327,8 @@ async function markets(env){
   if(!gold21k&&cached?.gold21k)gold21k=Number(cached.gold21k)||0;
   if(!gold18k&&cached?.gold18k)gold18k=Number(cached.gold18k)||0;
   const v={
-    updated:new Date().toISOString(),
+    updated:fxFetchedAt||goldFetchedAt||cached?.updated||new Date().toISOString(),
+    fetchedAt:fxFetchedAt||goldFetchedAt||cached?.fetchedAt||new Date().toISOString(),
     ratesDate:ratesDate||cached?.ratesDate||null,
     usdEgp,eurEgp,gbpEgp,chfEgp,
     gold24k,gold21k,gold18k,
@@ -332,8 +340,8 @@ async function markets(env){
       goldSource:provider.goldSource||cached?.provider?.goldSource||""
     }
   };
-  if(env.NOWPULSE_KV&&[v.usdEgp,v.eurEgp,v.gbpEgp,v.gold24k,v.gold21k,v.gold18k].some(x=>Number(x)>0))
-    await env.NOWPULSE_KV.put("markets:v3",JSON.stringify(v),{expirationTtl:60}).catch(()=>{});
+  if(env.NOWPULSE_KV&&[v.usdEgp,v.eurEgp,v.gbpEgp,v.gold24k,v.gold21k,v.gold18k].every(x=>Number(x)>0))
+    await env.NOWPULSE_KV.put(cacheKey,JSON.stringify(v),{expirationTtl:120}).catch(()=>{});
   return v;
 }
 async function weather(env,city="cairo"){const s=CITY_COORDS[city]?city:"cairo",k="weather:"+s,c=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(k,"json").catch(()=>null):null;if(c)return c;try{const r=await timeoutFetch("https://api.open-meteo.com/v1/forecast?latitude="+CITY_COORDS[s][0]+"&longitude="+CITY_COORDS[s][1]+"&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto",{},5000);if(!r.ok)throw Error();const d=await r.json(),v={city:s,temperature:d.current?.temperature_2m,humidity:d.current?.relative_humidity_2m,code:d.current?.weather_code,updated:new Date().toISOString()};if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(k,JSON.stringify(v),{expirationTtl:900}).catch(()=>{});return v;}catch{return c||{city:s,temperature:null,humidity:null,code:null};}}
