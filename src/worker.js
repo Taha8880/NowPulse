@@ -1,3 +1,5 @@
+import {NowPulseGuardian} from "./ai-guardian.js";
+export {NowPulseGuardian};
 const VERSION="7.0.0";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const TTL={news:120,market:180,weather:300};
