@@ -40,6 +40,9 @@ jobs:
       - name: Validate package scripts
         run: npm run check
 
+      - name: Run product contract test
+        run: npm run test:contract
+
       - name: Validate product contract
         run: |
           set -euo pipefail
