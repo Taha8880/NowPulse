@@ -68,12 +68,15 @@ The AI is expected to inspect the complete product on schedule without waiting f
 - Quotes were changed from journalism-themed phrases to simple life wisdom.
 - Professional inline SVG NowPulse branding and responsive design were added.
 - AI Manager reached 9.x and uses persistent KV maintenance memory.
-- Durable Agent + Workflow control plane was introduced in v5.8.0.
+- Durable Agent + Workflow control plane is part of the v6.0.0 architecture.
 - GitHub validation now includes dependency installation, JavaScript syntax, Wrangler dry-run and production smoke tests.
 - The current objective is a continuously improving production platform, not a one-time bug fix.
 
-## New product innovation: TimeShift
-- NowPulse articles can remember a reader's saved version locally in the browser and show what changed when the reader returns.
-- The feature is privacy-preserving: the snapshot remains in localStorage and is not uploaded.
-- Preserve the TimeShift UX and its purpose: transform an article from a static page into a time-aware object that answers "what changed since I last read this?" without forcing the reader to reread the whole story.
-- Future AI improvements should extend this concept toward reliable story evolution, but must not invent changes or claim that a change occurred without evidence.
+## Current product architecture target
+- v6.0.0 is a cohesive product release, not a collection of symptom patches.
+- Homepage rendering must stay fast: article images resolve through the semantic image endpoint instead of bulk-blocking page generation.
+- Image selection is source-first and semantic, with GDELT/Wikipedia/Wikimedia fallbacks and an explicit blacklist for publisher branding.
+- Market data uses independent live FX and gold providers with per-provider status and isolated cached fallback.
+- AI Manager uses GLM-5.2 as primary reasoning with Llama fallback.
+- Product contract tests must run in CI and protect news, images, markets, article evidence, Story Hub, SEO and AdSense requirements.
+- No dead TimeShift UI is required; future story-evolution features must be implemented only when they have a complete user-facing flow and reliable evidence.
