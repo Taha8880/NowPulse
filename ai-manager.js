@@ -1,4 +1,4 @@
-const VERSION="11.0.0",REPO="Taha8880/NowPulse",BRANCH="main",WORKER="src/worker.js",SITE="https://nowpulse.tavengers16.workers.dev",MODEL="@cf/zai-org/glm-4.7-flash";
+const VERSION="12.0.0",REPO="Taha8880/NowPulse",BRANCH="main",WORKER="src/worker.js",SITE="https://nowpulse.tavengers16.workers.dev",MODEL="@cf/zai-org/glm-4.7-flash";
 const out=(x,s=200)=>new Response(JSON.stringify(x,null,2),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}});
 const txt=x=>typeof x==="string"?x:(x?.response||x?.output_text||x?.choices?.[0]?.message?.content||"");
 async function gh(env,path,init={}){if(!env.NOWPULSE_GITHUB_TOKEN)throw Error("NOWPULSE_GITHUB_TOKEN missing");const r=await fetch("https://api.github.com/repos/"+REPO+path,{...init,headers:{Authorization:"Bearer "+env.NOWPULSE_GITHUB_TOKEN,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json"}});const t=await r.text();let d={};try{d=t?JSON.parse(t):{}}catch{}if(!r.ok)throw Error("GitHub "+r.status+": "+(d.message||t.slice(0,300)));return d}
