@@ -59,8 +59,8 @@ jobs:
             ["Guardian export", w, "NowPulseGuardian"],
             ["Workflow export", w, "NowPulseMaintenanceWorkflow"],
             ["Workflow type", w, '"type": "workflow"'],
-            ["Worker cron trigger", fs.readFileSync("src/worker.js", "utf8"), "ai:maintenance:trigger:"],
-            ["15-minute trigger window", fs.readFileSync("src/worker.js", "utf8"), "900000"],
+            ["Workflow loopback trigger", fs.readFileSync("src/worker.js", "utf8"), "ctx.exports.NowPulseMaintenanceWorkflow.create"],
+            ["15-minute maintenance window", fs.readFileSync("src/worker.js", "utf8"), "getUTCMinutes()%15===0"],
             ["GitHub secret access", wf, "NOWPULSE_GITHUB_TOKEN"],
             ["Guardian agent access", wf, "getAgentByName"]
           ]) {
