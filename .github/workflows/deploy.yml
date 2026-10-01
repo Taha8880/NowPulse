@@ -154,23 +154,23 @@ jobs:
           test "$ok" = "1"
 
           home="$(curl -fsSL --max-time 20 "$base/")"
-          echo "$home" | grep -q 'NowPulse'
+          grep -q 'NowPulse' <<< "$home"
           article_count="$(printf '%s' "$home" | grep -o '/article/' | wc -l | tr -d ' ')"
           test "$article_count" -gt 0
 
           markets="$(curl -fsSL --max-time 20 "$base/api/markets")"
           for key in usdEgp eurEgp gbpEgp gold24k gold21k gold18k; do
-            echo "$markets" | grep -q "\"$key\""
+            grep -q "\"$key\"" <<< "$markets"
           done
 
           ads="$(curl -fsSL --max-time 20 "$base/ads.txt")"
-          echo "$ads" | grep -q 'google.com, pub-1235197294708204'
+          grep -q 'google.com, pub-1235197294708204' <<< "$ads"
 
           sitemap="$(curl -fsSL --max-time 20 "$base/sitemap.xml")"
-          echo "$sitemap" | grep -q '<urlset'
+          grep -q '<urlset' <<< "$sitemap"
 
           search="$(curl -fsSL --max-time 20 "$base/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar")"
-          echo "$search" | grep -q 'NowPulse'
+          grep -q 'NowPulse' <<< "$search"
 
           echo "Production verification passed: health, news, markets, ads.txt, sitemap and Arabic search are live."
 
