@@ -53,15 +53,22 @@ async function wikimediaImage(query){try{const url="https://commons.wikimedia.or
 async function extractImage(article){try{const r=await timeoutFetch(article.link,{headers:{"user-agent":"Mozilla/5.0 NowPulseBot/1.0","accept":"text/html,application/xhtml+xml"}},4500);if(r.ok){const image=imageFromHtml(await r.text(),article.link);if(image&&!/logo|icon|sprite|favicon/i.test(image))return image;}}catch{}const semantic=await wikipediaImage(article.title);if(semantic)return semantic;return await wikimediaImage(article.title);}
 async function enrichImages(env,items){
   const list=Array.isArray(items)?items:[];
-  const out=await Promise.all(list.map(async a=>{
-    const key="img:"+a.id;
-    let image=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(key).catch(()=>null):null;
-    if(!image && /^https?:\/\//i.test(a.originalImage||"") && !/logo|icon|sprite|favicon/i.test(a.originalImage)) image=a.originalImage;
-    if(!image) image=await extractImage(a);
-    if(image && env.NOWPULSE_KV) await env.NOWPULSE_KV.put(key,image,{expirationTtl:604800}).catch(()=>{});
-    return {...a,image:image||""};
-  }));
-  return out;
+  const target=list.slice(0,30);
+  const rest=list.slice(30);
+  const out=[];
+  for(let i=0;i<target.length;i+=5){
+    const batch=target.slice(i,i+5);
+    const results=await Promise.all(batch.map(async a=>{
+      const key="img:"+a.id;
+      let image=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(key).catch(()=>null):null;
+      if(!image && /^https?:\/\//i.test(a.originalImage||"") && !/logo|icon|sprite|favicon/i.test(a.originalImage)) image=a.originalImage;
+      if(!image) image=await extractImage(a);
+      if(image && env.NOWPULSE_KV) await env.NOWPULSE_KV.put(key,image,{expirationTtl:604800}).catch(()=>{});
+      return {...a,image:image||""};
+    }));
+    out.push(...results);
+  }
+  return [...out,...rest];
 }
 function aiText(r){return r?.response||r?.result?.response||r?.output_text||"";}
 function relatedFor(article,items){const stop=new Set(["من","في","على","عن","إلى","مع","هذا","هذه","ذلك","التي","الذي","the","and","for","with","from","news","بعد","قبل","اليوم","أمس"]);const tokens=new Set(cleanText(article.title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^\p{L}\p{N}]/gu,"")).filter(x=>x.length>3&&!stop.has(x)));return items.filter(x=>x.id!==article.id).map(x=>{const xt=cleanText(x.title).toLowerCase().split(/\s+/).map(t=>t.replace(/[^\p{L}\p{N}]/gu,""));const score=xt.reduce((n,t)=>n+(tokens.has(t)?1:0),0);return{...x,score};}).filter(x=>x.score>=2).sort((a,b)=>b.score-a.score).slice(0,5);}
