@@ -96,7 +96,7 @@ function between(xml,tag){const m=String(xml).match(new RegExp("<"+tag+"[^>]*>([
 function xmlItems(xml){const out=[];for(const block of String(xml).match(/<item\b[\s\S]*?<\/item>/gi)||[]){const title=stripHtml(between(block,"title")),link=stripHtml(between(block,"link")),date=isoDate(stripHtml(between(block,"pubDate")||between(block,"dc:date"))),description=stripHtml(between(block,"description")),source=stripHtml(between(block,"source"));const media=block.match(/<(?:media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i);const enclosure=block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);const image=media?.[1]||enclosure?.[1]||"";if(title&&link)out.push({title,link,description,source,date,originalImage:image});}return out;}
 function classify(title,category){if(category&&CATEGORIES[category])return category;const v=String(title).toLowerCase();if(/football|soccer|match|goal|premier|champions|sport|محمد صلاح|أهلي|زمالك/.test(v))return"sports";if(/stock|market|gold|oil|economy|business|bank|currency|اقتصاد|ذهب|دولار/.test(v))return"economy";if(/technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي/.test(v))return"tech";if(/health|medical|hospital|doctor|صحة|طب/.test(v))return"health";if(/movie|film|music|actor|actress|entertainment|فن|فيلم|مسلسل/.test(v))return"arts";if(/travel|tourism|flight|airport|سياحة|سفر|طيران/.test(v))return"travel";if(/president|government|election|minister|politic|رئيس|حكومة|انتخابات|سياسة/.test(v))return"politics";return"world";}
 function makeId(a){return(`${a.category}-${a.title}-${a.link}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-+|-+$/g,"").slice(0,100))+"-"+new Date(a.date).getTime();}
-function normalizeArticle(raw,category){const a={...raw};a.title=cleanText(a.title);a.description=cleanText(a.description);a.source=cleanText(a.source)||"News source";a.date=isoDate(a.date);a.category=classify(a.title,category);a.id=a.id||makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";const rt=(a.title+" "+a.source).toLowerCase();a.region=/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(rt)?"egypt":/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(rt)?"arab":"world";return a;}
+function normalizeArticle(raw,category){const a={...raw};a.title=cleanText(a.title);a.description=cleanText(a.description);a.source=cleanText(a.source)||"News source";a.date=isoDate(a.date);a.category=classify(a.title,category);a.id=a.id||makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";a.image=a.originalImage||"";const rt=(a.title+" "+a.source).toLowerCase();a.region=/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(rt)?"egypt":/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(rt)?"arab":"world";return a;}
 async function gdeltFeed(query,category="world",lang="ar"){try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(query)+"&mode=artlist&format=json&maxrecords=50&timespan=3d&sort=datedesc";const r=await timeoutFetch(u,{headers:{accept:"application/json","user-agent":"NowPulse/1.0"}},7000);if(!r.ok)return[];const d=await r.json();return(Array.isArray(d?.articles)?d.articles:[]).map(x=>normalizeArticle({title:x.title||"",link:x.url||"",description:x.description||"",source:x.domain||x.sourcecountry||"GDELT",date:x.seendate||new Date().toISOString(),originalImage:x.socialimage||""},category)).filter(a=>a.title&&a.link);}catch{return[];}}
 async function gdeltImage(title){try{const q=cleanText(title).slice(0,180);if(!q)return"";const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent('"'+q.replace(/"/g," ")+'"')+"&mode=artlist&format=json&maxrecords=12&timespan=30d&sort=datedesc";const r=await timeoutFetch(u,{headers:{accept:"application/json","user-agent":"NowPulseImageBot/1.0"}},5000);if(!r.ok)return"";const d=await r.json();for(const x of Array.isArray(d?.articles)?d.articles:[]){const u=x?.socialimage;if(validArticleImage(u))return u;}}catch{}return"";}
 async function fetchFeed(category,url){try{const r=await timeoutFetch(url,{headers:{accept:"application/rss+xml, application/xml, text/xml"}});if(!r.ok)return[];const cutoff=Date.now()-FRESH_HOURS*3600000;return xmlItems(await r.text()).filter(x=>new Date(x.date).getTime()>=cutoff).map(x=>normalizeArticle(x,category));}catch{return[];}}
@@ -104,7 +104,55 @@ function newsPriority(a){const t=(a.title+" "+a.source).toLowerCase();if(a.regio
 async function loadFeed(env,force=false,lang="ar"){const feedKey="feed:latest:"+lang;const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(feedKey,"json").catch(()=>null):null;if(!force&&Array.isArray(cached)&&cached.length)return cached;const feeds=lang==="en"?FEEDS_EN:FEEDS;const groups=await Promise.all(feeds.map(([cat,u])=>fetchFeed(cat,u)));const map=new Map();for(const g of groups)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);let items=[...map.values()];if(items.length<10){const fallback=lang==="en"?await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor)","egypt","en"):await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor OR مصر OR القاهرة OR الإسكندرية)","egypt","ar");for(const a of fallback)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}items=[...map.values()].sort((a,b)=>((newsPriority(b)-newsPriority(a))*6*3600000+(new Date(b.date).getTime()-new Date(a.date).getTime()))).slice(0,MAX_LATEST);if(env.NOWPULSE_KV&&items.length)await env.NOWPULSE_KV.put(feedKey,JSON.stringify(items),{expirationTtl:300}).catch(()=>{});return items;}
 async function archiveFeed(env,items,lang="ar"){if(!env.NOWPULSE_KV||!items.length)return;const old=await env.NOWPULSE_KV.get("feed:archive:"+lang,"json").catch(()=>[]);const cutoff=Date.now()-ARCHIVE_DAYS*86400000,map=new Map();for(const a of [...items,...(Array.isArray(old)?old:[])]){if(new Date(a.date).getTime()<cutoff)continue;if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}await env.NOWPULSE_KV.put("feed:archive:"+lang,JSON.stringify([...map.values()].slice(0,1000)),{expirationTtl:ARCHIVE_DAYS*86400}).catch(()=>{});}
 function resolveUrl(raw,base){try{return new URL(raw,base).href}catch{return"";}}
-function imageFromHtml(html,base,title=""){const bs=String.fromCharCode(92);const bad=/logo|icon|sprite|favicon|avatar|placeholder|default-image|brand|masthead|header-image|site-image/i;const tokens=new Set(cleanText(title).toLowerCase().split(" ").map(x=>x.replace(/[^a-z0-9\u0600-\u06ff]/gi,"")).filter(x=>x.length>3));const candidates=[];const add=(raw,context="")=>{const u=resolveUrl(raw,base);if(!(u.startsWith("http://")||u.startsWith("https://"))||bad.test(u))return;const text=cleanText(context).toLowerCase();let score=0;for(const t of tokens)if(text.includes(t))score+=3;if(/article|story|content|main|featured|hero|news/i.test(context))score+=2;if(/thumb|thumbnail/i.test(context))score+=1;candidates.push({u,score});};const tagRe=new RegExp("<(?:img|meta|link)"+bs+"b[^>]*>","gi");const attrRe=new RegExp("(?:src|data-src|data-lazy-src|data-original|content|href)=[\\\"']([^\\\"']+)[\\\"']","i");const ctxRe=new RegExp("(?:alt|title|class|id|property|name|rel)=[\\\"']([^\\\"']+)[\\\"']","gi");for(const m of String(html).matchAll(tagRe)){const tag=m[0];const src=tag.match(attrRe);if(!src)continue;const ctx=[...tag.matchAll(ctxRe)].map(x=>x[1]).join(" ");add(src[1],ctx);}const ldRe=new RegExp("<script[^>]+type=[\\\"']application/json|application/ld\\+json[\\\"'][^>]*>([\\s\\S]*?)</script>","gi");const ld=String(html).match(new RegExp("<script[^>]+type=[\\\"']application/ld\\+json[\\\"'][^>]*>([\\s\\S]*?)</script>","gi"))||[];for(const block of ld){try{const raw=block.replace(new RegExp("^<script[^>]*>|</script>$","gi"),"");const data=JSON.parse(raw);const nodes=Array.isArray(data)?data:[data,...(Array.isArray(data["@graph"])?data["@graph"]:[])];for(const n of nodes){const im=n&&n.image;for(const v of Array.isArray(im)?im:[im]){const u=typeof v==="string"?v:v&&v.url;add(u,JSON.stringify(n).slice(0,1200));}}}catch{}}candidates.sort((a,b)=>b.score-a.score);return candidates.length?candidates[0].u:"";}
+function imageFromHtml(html,base,title=""){
+  const bs=String.fromCharCode(92);
+  const bad=/logo|icon|sprite|favicon|avatar|placeholder|default-image|brand|masthead|header-image|site-image|publisher/i;
+  const tokens=new Set(cleanText(title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^a-z0-9\u0600-\u06ff]/gi,"")).filter(x=>x.length>2));
+  const candidates=[];
+  const add=(raw,context="",priority=0)=>{
+    const u=resolveUrl(raw,base);
+    if(!(u.startsWith("http://")||u.startsWith("https://"))||bad.test(u))return;
+    const text=cleanText(context).toLowerCase();
+    const path=u.toLowerCase();
+    let score=priority;
+    for(const t of tokens){
+      if(text.includes(t))score+=5;
+      if(path.includes(t))score+=2;
+    }
+    if(/article|story|content|main|featured|hero|news|og:image|twitter:image/i.test(context))score+=3;
+    if(/thumb|thumbnail/i.test(context))score+=1;
+    if(/logo|icon|avatar|favicon|brand|masthead|header/i.test(text))score-=20;
+    candidates.push({u,score});
+  };
+  const tagRe=new RegExp("<(?:img|meta|link)"+bs+"b[^>]*>","gi");
+  const attrRe=new RegExp("(?:src|data-src|data-lazy-src|data-original|content|href)=[\\\"']([^\\\"']+)[\\\"']","i");
+  const ctxRe=new RegExp("(?:alt|title|class|id|property|name|rel)=[\\\"']([^\\\"']+)[\\\"']","gi");
+  for(const m of String(html).matchAll(tagRe)){
+    const tag=m[0];
+    const src=tag.match(attrRe);
+    if(!src)continue;
+    const ctx=[...tag.matchAll(ctxRe)].map(x=>x[1]).join(" ");
+    const priority=/property=[\\\"'](?:og:image|og:image:url|twitter:image)[\\\"']/i.test(tag)?20:0;
+    add(src[1],ctx,priority);
+  }
+  const ld=String(html).match(/<script[^>]+type=[\\\"']application\\/ld\\+json[\\\"'][^>]*>([\\s\\S]*?)<\\/script>/gi)||[];
+  for(const block of ld){
+    try{
+      const raw=block.replace(/^<script[^>]*>|<\\/script>$/gi,"");
+      const data=JSON.parse(raw);
+      const nodes=Array.isArray(data)?data:[data,...(Array.isArray(data["@graph"])?data["@graph"]:[])];
+      for(const n of nodes){
+        const im=n&&n.image;
+        for(const v of Array.isArray(im)?im:[im]){
+          const u=typeof v==="string"?v:v&&v.url;
+          add(u,JSON.stringify(n).slice(0,1800),12);
+        }
+      }
+    }catch{}
+  }
+  candidates.sort((a,b)=>b.score-a.score);
+  return candidates[0]?.u||"";
+}
 function semanticImageQueries(title){const raw=cleanText(title);const compact=raw.replace(/\b(news|today|latest|breaking|خبر|عاجل|آخر الأخبار|اليوم)\b/gi," ").replace(/\s+/g," ").trim();const tokens=compact.split(/\s+/).filter(Boolean);const queries=[];if(compact)queries.push(compact);if(tokens.length>2)queries.push(tokens.slice(0,6).join(" "));const people=compact.match(/[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3}/g)||[];queries.push(...people);if(/محمد صلاح|mohamed salah/i.test(compact))queries.unshift("Mohamed Salah football");if(/الأهلي|al ahly/i.test(compact))queries.push("Al Ahly football");if(/الزمالك|zamalek/i.test(compact))queries.push("Zamalek football");return [...new Set(queries.map(x=>x.trim()).filter(Boolean))].slice(0,5);}
 async function wikipediaImage(query){for(const q of semanticImageQueries(query)){for(const lang of ["en","ar"]){try{const url="https://"+lang+".wikipedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(q)+"&gsrnamespace=0&prop=pageimages&piprop=thumbnail&pithumbsize=1000&format=json&origin=*";const r=await timeoutFetch(url,{},3500);if(!r.ok)continue;const d=await r.json();const pages=Object.values(d?.query?.pages||{});for(const p of pages){const u=p?.thumbnail?.source;if(u&&/^https?:\/\//i.test(u)&&!/logo|icon|symbol|flag/i.test(u))return u;}}catch{}}}return"";}
 async function wikimediaImage(query){for(const q of semanticImageQueries(query)){try{const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrlimit=8&gsrsearch="+encodeURIComponent(q)+"&prop=imageinfo&iiprop=url|mime&iiurlwidth=1000&format=json&origin=*";const r=await timeoutFetch(url,{},3500);if(!r.ok)continue;const d=await r.json();for(const p of Object.values(d?.query?.pages||{})){const u=p?.imageinfo?.[0]?.thumburl||p?.imageinfo?.[0]?.url;if(u&&/^https?:\/\//i.test(u)&&!/logo|icon|symbol|flag|sprite/i.test(u))return u;}}catch{}}return"";}
