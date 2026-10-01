@@ -44,8 +44,9 @@ jobs:
         run: |
           set -euo pipefail
           grep -q 'const VERSION = "6.1.0"' src/worker.js
-          grep -q 'img:v5:' src/worker.js
+          grep -q 'img:v6:' src/worker.js
           grep -q 'wikipediaImage' src/worker.js
+          grep -q 'getAgentByName' src/worker.js
           grep -q 'gdeltImage' src/worker.js
           grep -q 'api.frankfurter.dev/v2/rates' src/worker.js
           grep -q 'api.goldprice.dev/v1/carat' src/worker.js
