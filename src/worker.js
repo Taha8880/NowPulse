@@ -1,4 +1,4 @@
-const VERSION = "5.4.0";
+const VERSION = "5.5.0";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
 const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const MAX_LATEST = 120;
@@ -129,8 +129,62 @@ async function enrichImages(env,items){
 }
 function aiText(r){return r?.response||r?.result?.response||r?.output_text||"";}
 function relatedFor(article,items){const stop=new Set(["من","في","على","عن","إلى","مع","هذا","هذه","ذلك","التي","الذي","the","and","for","with","from","news","بعد","قبل","اليوم","أمس"]);const tokens=new Set(cleanText(article.title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^\p{L}\p{N}]/gu,"")).filter(x=>x.length>3&&!stop.has(x)));return items.filter(x=>x.id!==article.id).map(x=>{const xt=cleanText(x.title).toLowerCase().split(/\s+/).map(t=>t.replace(/[^\p{L}\p{N}]/gu,""));const score=xt.reduce((n,t)=>n+(tokens.has(t)?1:0),0);return{...x,score};}).filter(x=>x.score>=2).sort((a,b)=>b.score-a.score).slice(0,5);}
-async function writeArticle(env,article,related,lang="ar"){const cacheKey="article:"+lang+":"+article.id;if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(cacheKey).catch(()=>null);if(cached&&cached.length>120)return cached;}if(!env.AI)return fallbackArticle(article);const sources=[article,...related].slice(0,5).map((x,i)=>`SOURCE ${i+1}\nTitle: ${x.title}\nSource: ${x.source}\nDate: ${x.date}\nDescription: ${x.description}`).join("\n\n");const requestedLanguage=lang==="en"?"English":"Arabic";try{const prompt={messages:[{role:"system",content:"You are the senior editor of NowPulse, an Egyptian and Arab news platform. Write a factual news article about ONLY the primary event. Use only the supplied information. Never invent facts, numbers, dates, names, quotes, motives or causes. Do not turn opinions into facts. If information is uncertain, say so. Write in the requested language. Output plain text only, with 5 to 8 natural paragraphs, no Markdown, no bullets, no headings, no labels and no source list."},{role:"user",content:"Requested language: "+requestedLanguage+"\nPrimary headline: "+article.title+"\nPrimary source: "+article.source+"\nPrimary description: "+article.description+"\n\nPotential related sources:\n"+sources}],max_tokens:2200,temperature:0.2};let r=await env.AI.run(AI_MODEL,prompt);let output=aiText(r).trim();if(!output||output.length<180){r=await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",prompt);output=aiText(r).trim();}if(!output)throw Error("AI empty response");output=output.replace(/\r/g,"").replace(/^```[a-z]*\s*/i,"").replace(/\s*```$/,"").replace(/^#+\s*/gm,"").replace(/^[-*•]\s+/gm,"").replace(/^(مقدمة|Introduction|الخلاصة|Summary|المقال|Article)\s*:?\s*/gim,"").trim();if(output.length<180)throw Error("AI output too short");if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(cacheKey,output,{expirationTtl:21600}).catch(()=>{});return output;}catch(error){console.error("AI article generation failed",error?.message||error);return fallbackArticle(article);}}
-function fallbackArticle(a){return [a.title,a.description||"تتوفر المعلومات الحالية من المصدر المرتبط بهذا الخبر.","قد ترد تحديثات جديدة عند ظهور معلومات مؤكدة إضافية."].filter(Boolean).join("\n\n");}
+function htmlArticleText(html){
+  const src=String(html||"");
+  const bodies=[];
+  for(const m of src.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
+    try{
+      const d=JSON.parse(m[1].trim());
+      const arr=Array.isArray(d)?d:[d];
+      for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
+    }catch{}
+  }
+  const p=[...src.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
+  bodies.push(p.join("\\n"));
+  for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
+  return bodies.map(cleanText).sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
+}
+async function sourceEvidence(article){
+  try{
+    const r=await timeoutFetch(article.link,{redirect:"follow",headers:{"user-agent":"Mozilla/5.0 NowPulse/1.0","accept":"text/html,application/xhtml+xml"}},9000);
+    if(r.ok){const text=htmlArticleText(await r.text());if(text.length>=500)return text;}
+  }catch{}
+  return "";
+}
+async function writeArticle(env,article,related,lang="ar"){
+  const cacheKey="article:v2:"+lang+":"+article.id;
+  if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(cacheKey).catch(()=>null);if(cached&&cached.length>600)return cached;}
+  const evidence=await sourceEvidence(article);
+  if(!env.AI)return fallbackArticle(article,evidence);
+  const requestedLanguage=lang==="en"?"English":"Arabic";
+  const relatedText=(related||[]).slice(0,3).map((x,i)=>`RELATED ${i+1}: ${x.title} | ${x.source} | ${x.description}`).join("\n");
+  const prompt={messages:[
+    {role:"system",content:"You are NowPulse senior news editor. Write a REAL, substantive news article about the primary event, not filler. Use only supplied evidence. Paraphrase; never invent names, numbers, dates, quotes, causes or motives. Explain the confirmed event, people or institutions involved, important figures/details, context and next steps only when supported. Never repeat generic sentences such as 'لا توجد معلومات متاحة'. If evidence is incomplete, state the confirmed facts clearly instead of inventing. Write 7-10 substantial paragraphs in the requested language, plain text, no headings, bullets, labels or source list."},
+    {role:"user",content:`Language: ${requestedLanguage}
+Headline: ${article.title}
+Source: ${article.source}
+Date: ${article.date}
+Feed description: ${article.description||"(none)"}
+PRIMARY SOURCE EVIDENCE:
+${evidence||"(source page could not be extracted; do not invent beyond the supplied headline/description)"}
+RELATED:
+${relatedText}
+Write the finished article now. Every factual claim must be grounded in the supplied evidence.`}
+  ],max_tokens:3200,temperature:0.15};
+  try{
+    let out=aiText(await env.AI.run(AI_MODEL,prompt)).trim();
+    if(out.length<700)out=aiText(await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",prompt)).trim();
+    out=out.replace(/\\r/g,"").replace(/^\`\`\`[a-z]*\\s*/i,"").replace(/\\s*\`\`\`$/,"").replace(/^#+\\s*/gm,"").replace(/^[-*•]\\s+/gm,"").trim();
+    if(out.length<700)throw Error("AI article output too short");
+    if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(cacheKey,out,{expirationTtl:21600}).catch(()=>{});
+    return out;
+  }catch(e){console.error("AI article generation failed",e?.message||e);return fallbackArticle(article,evidence);}
+}
+function fallbackArticle(a,evidence=""){
+  const t=cleanText(evidence);
+  if(t.length>=500){const p=t.split(/(?<=[.!؟])\\s+/u).filter(x=>x.length>35).slice(0,8);if(p.length>=3)return p.join(" ");}
+  return [a.title,a.description||"تعذر استخراج نص المصدر الأصلي حاليًا، ولن يتم اختلاق تفاصيل غير مؤكدة.","سيعاد بناء المادة عند توفر المصدر."].filter(Boolean).join("\n\n");
+}
 async function searchNews(env,q,lang="ar"){q=cleanText(q).slice(0,120);if(!q)return[];const key="search:v6:"+lang+":"+q.toLowerCase();if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(key,"json").catch(()=>null);if(Array.isArray(cached)&&cached.length)return cached;}const latest=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:latest:"+lang,"json").catch(()=>[]):[];const archive=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("feed:archive:"+lang,"json").catch(()=>[]):[];const normalizeSearch=s=>cleanText(s).toLowerCase().normalize("NFKD").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[إأآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();const terms=normalizeSearch(q).split(/\\s+/).filter(t=>t.length>1);const matches=a=>{const hay=normalizeSearch((a.title||"")+" "+(a.description||"")+" "+(a.source||""));return terms.length>0&&terms.every(t=>hay.includes(t))};const local=[...(Array.isArray(latest)?latest:[]),...(Array.isArray(archive)?archive:[])].filter(matches);let remote=[];try{remote=await gdeltFeed(lang==="en"?q:"("+q+")","world",lang);remote=remote.filter(matches);}catch{}const urls=lang==="en"?["https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:14d")+"&hl=en&gl=EG&ceid=EG:en"]:["https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:14d")+"&hl=ar&gl=EG&ceid=EG:ar"];const groups=await Promise.all(urls.map(async u=>{try{const r=await timeoutFetch(u,{headers:{accept:"application/rss+xml, application/xml, text/xml"}},7000);return r.ok?xmlItems(await r.text()).map(x=>normalizeArticle(x,"world")).filter(matches):[]}catch{return[]}}));const m=new Map();for(const a of [...local,...remote,...groups.flat()]){const k=a.link||a.title;if(!m.has(k))m.set(k,a);}const result=[...m.values()].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,40);if(env.NOWPULSE_KV&&result.length){await env.NOWPULSE_KV.put(key,JSON.stringify(result),{expirationTtl:60}).catch(()=>{});for(const a of result)await env.NOWPULSE_KV.put("article:"+a.id,JSON.stringify(a),{expirationTtl:604800}).catch(()=>{});}return result;}
 async function markets(env){
   const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("markets","json").catch(()=>null):null;
