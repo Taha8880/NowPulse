@@ -27,9 +27,9 @@
   "upload_source_maps": true,
   "vars": {
     "NOWPULSE_ENV": "production",
-    "NOWPULSE_VERSION": "5.3.2",
+    "NOWPULSE_VERSION": "5.7.0",
     "NOWPULSE_AI_REPAIR": "enabled",
-    "NOWPULSE_AI_REPAIR_MODE": "safe",
+    "NOWPULSE_AI_REPAIR_MODE": "auto",
     "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
     "NOWPULSE_GITHUB_BRANCH": "main",
     "NOWPULSE_WORKER_FILE": "src/worker.js",
