@@ -16,4 +16,10 @@ The maintenance AI must:
 
 The AI is an autonomous maintainer, not an uncontrolled code generator.
 
+Release policy:
+- A release is considered complete only after the repository is validated, the Worker deployment is confirmed, and production smoke tests pass.
+- Image cache keys must be versioned when image-selection logic changes so stale publisher-brand images cannot survive a resolver rebuild.
+- Autonomous repair scheduling must match the documented 15-minute maintenance policy.
+- The AI Manager allowlist must include every maintenance workflow it may legitimately need to repair; never broaden it to unrelated repositories.
+
 - Read AI_MEMORY.md as persistent product context before autonomous audits and repairs.
