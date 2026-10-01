@@ -1324,25 +1324,20 @@ Current Worker source:
 ${truncate(workerSource, 70000)}
 `;
 
-  const result =
-    await env.AI.run(
-      AI_MODEL,
-      {
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a conservative production JavaScript repair engineer."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 12000
-      }
-    );
+  const messages = [
+    {
+      role: "system",
+      content: "You are a conservative production JavaScript repair engineer."
+    },
+    { role: "user", content: prompt }
+  ];
+  let result;
+  try {
+    result = await env.AI.run(AI_MODEL, {messages, temperature:0.1, max_tokens:12000});
+  } catch (primaryError) {
+    console.warn("Primary NowPulse reasoning model failed; using fallback.", String(primaryError?.message||primaryError));
+    result = await env.AI.run(AI_FALLBACK_MODEL, {messages, temperature:0.1, max_tokens:12000});
+  }
 
   const raw =
     result?.response ||
