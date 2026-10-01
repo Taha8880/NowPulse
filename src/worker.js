@@ -1,7 +1,7 @@
 import { NowPulseGuardian } from "./ai-guardian.js";
 import { getAgentByName } from "agents";
 import { NowPulseMaintenanceWorkflow } from "./nowpulse-maintenance-workflow.js";
-const VERSION = "6.1.3";
+const VERSION = "6.1.5";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
 const AI_MODEL = "@cf/zai-org/glm-5.2";
 const AI_FALLBACK_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
