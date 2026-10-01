@@ -2,7 +2,7 @@
   "name": "nowpulse",
   "private": true,
   "description": "NowPulse bilingual news and information platform",
-  "version": "6.1.3",
+  "version": "6.1.5",
   "engines": {
     "node": ">=22"
   },
