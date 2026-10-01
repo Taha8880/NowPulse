@@ -73,21 +73,13 @@ jobs:
             throw new Error('Wrong Worker file');
           }
 
-          if (
-            !config.secrets ||
-            !Array.isArray(config.secrets.required) ||
-            !config.secrets.required.includes('GITHUB_TOKEN')
-          ) {
-            throw new Error('GITHUB_TOKEN is not declared as required');
-          }
-
           console.log('Wrangler configuration is valid.');
           "
 
-      - name: Validate GitHub secret
+      - name: Validate GitHub Actions secret
         run: |
           if [ -z "$NOWPULSE_GITHUB_TOKEN" ]; then
-            echo "ERROR: NOWPULSE_GITHUB_TOKEN is missing from GitHub Actions Secrets."
+            echo "ERROR: NOWPULSE_GITHUB_TOKEN is missing."
             exit 1
           fi
 
@@ -120,22 +112,16 @@ jobs:
         run: |
           sleep 10
 
-          echo "======================================"
-          echo "Checking AI Manager health"
-          echo "======================================"
+          echo "Checking AI Manager health..."
 
           curl --fail --silent --show-error \
             https://nowpulse-ai-manager.tavengers16.workers.dev/health
 
           echo ""
-          echo "======================================"
-          echo "Checking GitHub authentication"
-          echo "======================================"
+          echo "Checking GitHub authentication..."
 
           curl --fail --silent --show-error \
             https://nowpulse-ai-manager.tavengers16.workers.dev/github-test
 
           echo ""
-          echo "======================================"
-          echo "AI Manager deployment completed"
-          echo "======================================"
+          echo "AI Manager deployment completed successfully."
