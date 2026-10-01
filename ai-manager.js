@@ -1,4 +1,4 @@
-const VERSION = "8.2.0";
+const VERSION = "8.3.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
