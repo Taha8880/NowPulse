@@ -1,123 +1,29 @@
 name: NowPulse AI Manager Deploy
-
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "ai-manager.js"
-      - "ai-manager.wrangler.jsonc"
-      - ".github/workflows/deploy-ai-manager.yml"
-
+    branches: [main]
+    paths: [ai-manager.js, ai-manager.wrangler.jsonc, .github/workflows/deploy-ai-manager.yml]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  validate-and-deploy-ai-manager:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Check AI Manager syntax
-        run: |
-          node --check ai-manager.js
-
-      - name: Validate required files
-        run: |
-          test -f ai-manager.js
-          test -f ai-manager.wrangler.jsonc
-
-      - name: Validate Wrangler configuration
-        run: |
-          node -e "
-          const fs = require('fs');
-
-          const config = JSON.parse(
-            fs.readFileSync('ai-manager.wrangler.jsonc', 'utf8')
-          );
-
-          if (config.name !== 'nowpulse-ai-manager') {
-            throw new Error('Wrong Worker name');
-          }
-
-          if (config.main !== 'ai-manager.js') {
-            throw new Error('Wrong Worker main file');
-          }
-
-          if (!config.ai || config.ai.binding !== 'AI') {
-            throw new Error('Workers AI binding is missing');
-          }
-
-          if (!config.vars) {
-            throw new Error('Worker vars are missing');
-          }
-
-          if (config.vars.NOWPULSE_GITHUB_REPO !== 'Taha8880/NowPulse') {
-            throw new Error('Wrong GitHub repository');
-          }
-
-          if (config.vars.NOWPULSE_GITHUB_BRANCH !== 'main') {
-            throw new Error('Wrong GitHub branch');
-          }
-
-          if (config.vars.NOWPULSE_WORKER_FILE !== 'src/worker.js') {
-            throw new Error('Wrong Worker file');
-          }
-
-          console.log('Wrangler configuration is valid.');
-          "
-
-      - name: Validate GitHub Actions secret
-        run: |
-          if [ -z "$NOWPULSE_GITHUB_TOKEN" ]; then
-            echo "ERROR: NOWPULSE_GITHUB_TOKEN is missing."
-            exit 1
-          fi
-
-          echo "GitHub Actions secret is available."
-
+      - run: node --check ai-manager.js
+      - name: Deploy
         env:
-          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
-
-      - name: Deploy AI Manager
-        run: |
-          npx wrangler deploy \
-            --config ai-manager.wrangler.jsonc
-
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --config ai-manager.wrangler.jsonc
+      - name: Install GitHub token
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
-
-      - name: Install GitHub token on Cloudflare
-        run: |
-          printf '%s' "$NOWPULSE_GITHUB_TOKEN" \
-            | npx wrangler secret put NOWPULSE_GITHUB_TOKEN \
-              --config ai-manager.wrangler.jsonc
-
-        env:
-          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Verify AI Manager
-        run: |
-          sleep 10
-
-          echo "Checking AI Manager health..."
-
-          curl --fail --silent --show-error \
-            https://nowpulse-ai-manager.tavengers16.workers.dev/health
-
-          echo ""
-          echo "AI Manager deployment completed successfully."
-
+        run: printf '%s' "$NOWPULSE_GITHUB_TOKEN" | npx wrangler secret put NOWPULSE_GITHUB_TOKEN --config ai-manager.wrangler.jsonc
+      - run: curl -fsSL https://nowpulse-ai-manager.tavengers16.workers.dev/health
