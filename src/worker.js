@@ -62,16 +62,17 @@ function b64(s){return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").
 function unb64(s){try{return decodeURIComponent(escape(atob(s.replace(/-/g,"+").replace(/_/g,"/"))))}catch{return ""}}
 function safeUrl(v){try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.toString():""}catch{return ""}}
 
-async function fetchText(url,headers={}){
- const r=await fetch(url,{headers:{"user-agent":"NowPulse/9.0 (+https://nowpulse.tavengers16.workers.dev)",...headers}});
- if(!r.ok)throw Error("HTTP "+r.status);
- return await r.text();
+async function request(url,headers={},mode="text"){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),7000);
+ try{
+  const r=await fetch(url,{headers:{"user-agent":"NowPulse/9.0 (+https://nowpulse.tavengers16.workers.dev)","accept":mode==="json"?"application/json":"text/xml, text/plain, */*",...headers},signal:controller.signal});
+  if(!r.ok)throw Error("HTTP "+r.status);
+  return mode==="json"?await r.json():await r.text();
+ }finally{clearTimeout(timer)}
 }
-async function fetchJson(url,headers={}){
- const r=await fetch(url,{headers:{"user-agent":"NowPulse/9.0 (+https://nowpulse.tavengers16.workers.dev)","accept":"application/json",...headers}});
- if(!r.ok)throw Error("HTTP "+r.status);
- return await r.json();
-}
+const fetchText=(url,headers={})=>request(url,headers,"text");
+const fetchJson=(url,headers={})=>request(url,headers,"json");
 
 async function cacheRead(env,key){
  if(!env.NOWPULSE_KV)return null;
@@ -157,11 +158,10 @@ async function fallbackRss(lang,cat){
   ["BBC Business","https://feeds.bbci.co.uk/news/business/rss.xml"],
   ["BBC Technology","https://feeds.bbci.co.uk/news/technology/rss.xml"]
  ];
- const out=[];
- for(const [name,url] of feeds){
-  try{out.push(...parseRss(await fetchText(url),name))}catch{}
- }
- return out;
+ const results=await Promise.all(feeds.map(async([name,url])=>{
+  try{return parseRss(await fetchText(url),name)}catch{return[]}
+ }));
+ return results.flat();
 }
 
 async function gdeltFeed(q,lang){
@@ -185,9 +185,10 @@ async function feed(env,lang,cat="latest"){
   ["world", "https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+(ar?"ar":"en-US")+"&gl="+(ar?"EG":"US")+"&ceid="+(ar?"EG:ar":"US:en")]
  ];
  const all=[];
- for(const [region,url] of urls){
-  try{all.push(...parseRss(await fetchText(url),region))}catch{}
- }
+ const fetched=await Promise.all(urls.map(async([region,url])=>{
+  try{return parseRss(await fetchText(url),region)}catch{return[]}
+ }));
+ for(const items of fetched)all.push(...items);
  if(!all.length){
   all.push(...await fallbackRss(lang,cat));
  }
@@ -234,18 +235,28 @@ async function markets(env){
  const key="np9:markets";
  const old=await cacheRead(env,key);
  if(old&&now()-old.saved<TTL.markets*1000)return old.data;
- let data={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null,updated:null};
- try{
-  const r=await fetchJson("https://api.frankfurter.dev/v2/rates?base=USD&symbols=EGP,EUR,GBP,CHF");
-  const e=Number(r?.rates?.EGP),eur=Number(r?.rates?.EUR),gbp=Number(r?.rates?.GBP),chf=Number(r?.rates?.CHF);
-  if(e>0){data.usdEgp=e; if(eur>0)data.eurEgp=e/eur; if(gbp>0)data.gbpEgp=e/gbp; if(chf>0)data.chfEgp=e/chf;}
- }catch{}
- try{
-  const g=await fetchJson("https://goldprice.dev/api/v1/carat?currency=EGP");
-  for(const k of ["price_gram_24k","price_gram_21k","price_gram_18k"]){
-   if(Number(g?.[k])>0)data[{price_gram_24k:"gold24",price_gram_21k:"gold21",price_gram_18k:"gold18"}[k]]=Number(g[k]);
-  }
- }catch{}
+ const data={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null,updated:null};
+ let fx=null,gold=null;
+ const [fxResult,goldResult]=await Promise.allSettled([
+  fetchJson("https://open.er-api.com/v6/latest/USD"),
+  fetchJson("https://api.gold-api.com/price/XAU")
+ ]);
+ if(fxResult.status==="fulfilled")fx=fxResult.value;
+ if(goldResult.status==="fulfilled")gold=goldResult.value;
+ const e=Number(fx?.rates?.EGP),eur=Number(fx?.rates?.EUR),gbp=Number(fx?.rates?.GBP),chf=Number(fx?.rates?.CHF);
+ if(e>0){
+  data.usdEgp=e;
+  if(eur>0)data.eurEgp=e/eur;
+  if(gbp>0)data.gbpEgp=e/gbp;
+  if(chf>0)data.chfEgp=e/chf;
+ }
+ const ozUsd=Number(gold?.price);
+ if(ozUsd>0&&e>0){
+  const gram24=ozUsd*e/31.1034768;
+  data.gold24=gram24;
+  data.gold21=gram24*.875;
+  data.gold18=gram24*.75;
+ }
  data.updated=new Date().toISOString();
  if(Object.values(data).some(v=>typeof v==="number"&&v>0))await cacheWrite(env,key,data,TTL.markets);
  return old?.data&&!Object.values(data).some(v=>typeof v==="number"&&v>0)?old.data:data;
