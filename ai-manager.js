@@ -1212,10 +1212,10 @@ Rules:
 - Do not rewrite the entire Worker unless genuinely necessary.
 - Prefer safe complete-file repairs.
 - Never include GITHUB_TOKEN.
-- Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, malformed text, or runtime errors as real defects requiring repair.
+- Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, weak or filler article bodies, malformed text, stale or missing market values, or runtime errors as real defects requiring repair.
 - If the live site has no news, repair the ingestion/fallback path so the homepage can recover news without waiting for a user action.
-- Search must return relevant results from both local cached news and a reliable external fallback when local news is empty.
-- Image failures must never prevent news cards from rendering; use relevant semantic fallbacks or omit the image.
+- Search must return relevant results from both local cached news and a reliable external fallback when local news is empty. Review every runtime diagnostic field and repair all confirmed defects in the allowed files; do not treat HTTP 200 alone as proof that the feature works.
+- Image failures must never prevent news cards from rendering; use relevant semantic fallbacks or omit the image. Article pages must contain a substantive source-grounded article, not a title plus generic filler. The Worker must fetch and extract primary-source evidence before asking Workers AI to write the article, and article-generation cache keys must be invalidated when generation logic changes.
 - Worker must remain Cloudflare Worker compatible.
 
 Current Worker source:
