@@ -95,7 +95,7 @@ function xmlAttr(block,tag,attr){
  const m=block.match(re);
  return m?m[1]:"";
 }
-function goodImage(v){
+function mediaUrl(v){return String(v||"").startsWith("//")?"https:"+String(v):String(v||"")}\nfunction goodImage(v){
  const u=safeUrl(v);
  if(!u)return "";
  const x=u.toLowerCase();
@@ -103,7 +103,7 @@ function goodImage(v){
  return u;
 }
 function parseRss(xml,region){
- const blocks=xml.match(/<item\\b[\\s\\S]*?<\\/item>/gi)||[];
+ const blocks=xml.match(/<item\b[\s\S]*?<\/item>/gi)||[];
  return blocks.map(block=>{
   const link=safeUrl(xmlTag(block,"link"));
   const rawTitle=xmlTag(block,"title");
@@ -255,7 +255,7 @@ function imageSearchUrl(q){
 async function relatedImage(q){
  try{
   const d=await fetchJson(imageSearchUrl(q));
-  const x=(d.pages||[]).find(v=>goodImage(v?.thumbnail?.url?("https:"+v.thumbnail.url):""));
+  const x=(d.pages||[]).find(v=>goodImage(mediaUrl(v?.thumbnail?.url)));
   return x?.thumbnail?.url?("https:"+x.thumbnail.url):"";
  }catch{return ""}
 }
