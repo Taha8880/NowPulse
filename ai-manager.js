@@ -1226,7 +1226,7 @@ async function runtimeInspection(){
     try{
       const r=await fetch(PRODUCTION_URL+(path.startsWith("/")?path:"/"+path),{redirect:"follow",cache:"no-store"});
       const body=await r.text();
-      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\s\\S]*?)<\/div>/i);
+      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
       const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
       articleChecks.push({path,status:r.status,ok:r.ok,hasArticleText:Boolean(m),length:plain.length,filler:/لا توجد معلومات متاحة|No information is available|تعذر استخراج نص المصدر|تتوفر المعلومات الحالية من المصدر المرتبط|سيعاد بناء المادة/i.test(plain)});
     }catch(e){articleChecks.push({path,status:0,ok:false,error:text(e?.message||e)});}
