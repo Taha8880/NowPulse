@@ -1,3 +1,4 @@
+export class NowPulseGuardian { constructor(state,env){ this.state=state; this.env=env; } async fetch(){ return new Response(JSON.stringify({ok:true,service:"NowPulseGuardian",version:"9.0.0"}),{headers:{"content-type":"application/json; charset=UTF-8"}}); } }
 const VERSION="9.0.0";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const TTL={news:120,markets:60,weather:300,search:90};
