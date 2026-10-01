@@ -1,4 +1,4 @@
-const VERSION = "8.5.0";
+const VERSION = "9.0.0";
 
 const REPOSITORY = "Taha8880/NowPulse";
 const DEFAULT_BRANCH = "main";
@@ -12,7 +12,10 @@ const ALLOWED_REPAIR_FILES = new Set([
   "wrangler.jsonc",
   "ai-manager.wrangler.jsonc",
   ".github/workflows/deploy.yml",
-  ".github/workflows/deploy-ai-manager.yml"
+  ".github/workflows/deploy-ai-manager.yml",
+  ".github/workflows/validate-pr.yml",
+  ".github/workflows/self-heal.yml",
+  "package.json"
 ]);
 
 const REQUIRED_FILES = [
@@ -102,6 +105,11 @@ Core requirements:
 47. After designing a repair, perform a second independent review of the proposed result for regressions, syntax, security, UX, localization and feature loss before returning the repair.
 48. Treat the production runtime as the source of truth for user-visible defects. HTTP 200 alone is not proof that a feature works.
 49. If a defect cannot be safely fixed with available evidence, leave the feature intact and report the uncertainty instead of fabricating a solution.
+50. The AI is authorized to modify the actual source/configuration file that causes a confirmed defect, not merely add a workaround elsewhere. Trace the defect to its root cause first.
+51. The AI may modify package.json or maintenance workflows when the confirmed defect is in those files, but must not introduce unnecessary dependencies, credentials, or unsafe permissions.
+52. Self-improvement means improving the maintenance system using evidence from previous audits; it does not mean changing safety gates to make repairs easier.
+53. A repair cycle is not complete merely because a PR was created. Completion requires repository validation and a subsequent production verification cycle after merge.
+54. If validation fails, the next cycle must inspect the failure and repair the actual cause rather than repeatedly applying the same change.
 
 
 AUTONOMOUS_PRODUCT_VISION:
@@ -1290,6 +1298,10 @@ Rules:
 - Do not rewrite the Worker merely because browser APIs exist in CLIENT.
 - Do not rewrite the entire Worker unless genuinely necessary.
 - Prefer safe complete-file repairs.
+- Modify the file that actually causes the defect. Do not hide a backend/data/config bug with a frontend workaround.
+- If the defect is in ai-manager.js, repair the AI manager itself.
+- If the defect is in a workflow/config/package file, repair that exact file when evidence supports it.
+- If multiple files form one root cause, change the smallest complete set of files and explain the dependency between them.
 - Never include GITHUB_TOKEN.
 - Before deciding that no repair is needed, inspect the live production endpoints and treat empty news, broken search, missing images, weak or filler article bodies, malformed text, stale or missing market values, or runtime errors as real defects requiring repair.
 - If the live site has no news, repair the ingestion/fallback path so the homepage can recover news without waiting for a user action.
@@ -1436,6 +1448,15 @@ function validateRepairPlan(
     }
   }
 
+  for (const change of plan.changes) {
+    if (/\\.js$/.test(change.path) && change.path === WORKER_FILE) {
+      const arch = architectureInspection(change.content);
+      if (!arch.ok) throw new Error(`Worker architecture validation failed: ${arch.problems.join(" | ")}`);
+    }
+    if (change.path === "package.json") {
+      try { JSON.parse(change.content); } catch { throw new Error("AI produced invalid package.json."); }
+    }
+  }
   return true;
 }
 
@@ -1567,6 +1588,7 @@ async function runRepair(env) {
     );
 
   if (!plan.repairRequired) {
+    await saveAIMemory(env,{type:"audit",repairRequired:false,diagnosis:plan.diagnosis,validation:plan.validation});
     return {
       ok: true,
       repaired: false,
@@ -1636,6 +1658,7 @@ async function runRepair(env) {
       ].join("\n")
     );
 
+  await saveAIMemory(env,{type:"repair-pr",repairRequired:true,diagnosis:plan.diagnosis,changedFiles:updatedFiles,pullRequest:pullRequest.number});
   return {
     ok: true,
     repaired: true,
@@ -1773,6 +1796,8 @@ async function health(env) {
   };
 }
 
+async function loadAIMemory(env){if(!env.NOWPULSE_KV)return {};try{return JSON.parse(await env.NOWPULSE_KV.get("ai:guardian:memory")||"{}");}catch{return {};}}
+async function saveAIMemory(env,entry){if(!env.NOWPULSE_KV)return;try{const old=await loadAIMemory(env);const history=Array.isArray(old.history)?old.history:[];history.push({...entry,time:new Date().toISOString()});await env.NOWPULSE_KV.put("ai:guardian:memory",JSON.stringify({history:history.slice(-30)}),{expirationTtl:2592000});}catch(error){console.error("AI memory persistence failed",error?.stack||error);}}
 async function saveAIStatus(env,data){if(!env.NOWPULSE_KV)return;try{await env.NOWPULSE_KV.put("ai:guardian:status",JSON.stringify({...data,lastRun:new Date().toISOString(),version:VERSION}),{expirationTtl:172800});}catch(error){console.error("AI status persistence failed",error?.stack||error);}}
 
 async function handleRepair(env) {
