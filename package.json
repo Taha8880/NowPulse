@@ -1,7 +1,7 @@
 {
   "name": "nowpulse",
   "private": true,
-  "version": "6.1.0",
+  "version": "6.1.1",
   "engines": {
     "node": ">=22"
   },
@@ -11,7 +11,7 @@
   "scripts": {
     "check": "node --check src/worker.js && node --check src/ai-guardian.js && node --check src/nowpulse-maintenance-workflow.js && node --check ai-manager.js",
     "deploy": "wrangler deploy",
-    "test:contract": "node -e \"const fs=require('fs');const w=fs.readFileSync('src/worker.js','utf8'),a=fs.readFileSync('ai-manager.js','utf8'),r=fs.readFileSync('wrangler.jsonc','utf8');for(const [f,s] of [['worker',w],['ai-manager',a],['wrangler',r]])if(!s)throw Error(f+' missing');for(const s of ['img:v6:','wikipediaImage','getAgentByName','gdeltImage','api.frankfurter.dev/v2/rates','api.goldprice.dev/v1/carat','sourceEvidence','PRIMARY SOURCE EVIDENCE','story-hub','Created by Taha'])if(!w.includes(s))throw Error('worker contract missing: '+s);if(!w.includes('const VERSION = \\\"6.1.0\\\"'))throw Error('worker version contract missing');if(!a.includes('@cf/zai-org/glm-5.2'))throw Error('AI primary model missing');if(!r.includes('NowPulseMaintenanceWorkflow'))throw Error('Workflow export missing');console.log('NowPulse contract test passed');\""
+    "test:contract": "node scripts/contract-test.mjs"
   },
   "dependencies": {
     "agents": "^0.24.0"
