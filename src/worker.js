@@ -132,13 +132,13 @@ function imageFromHtml(html,base,title=""){
     const src=tag.match(attrRe);
     if(!src)continue;
     const ctx=[...tag.matchAll(ctxRe)].map(x=>x[1]).join(" ");
-    const priority=/property=[\\\"'](?:og:image|og:image:url|twitter:image)[\\\"']/i.test(tag)?20:0;
+    const priority=/property=["'](?:og:image|og:image:url|twitter:image)["']/i.test(tag)?20:0;
     add(src[1],ctx,priority);
   }
-  const ld=String(html).match(/<script[^>]+type=[\\\"']application\\/ld\\+json[\\\"'][^>]*>([\\s\\S]*?)<\\/script>/gi)||[];
+  const ld=String(html).match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)||[];
   for(const block of ld){
     try{
-      const raw=block.replace(/^<script[^>]*>|<\\/script>$/gi,"");
+      const raw=block.replace(/^<script[^>]*>|<\/script>$/gi,"");
       const data=JSON.parse(raw);
       const nodes=Array.isArray(data)?data:[data,...(Array.isArray(data["@graph"])?data["@graph"]:[])];
       for(const n of nodes){
