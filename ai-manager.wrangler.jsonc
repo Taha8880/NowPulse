@@ -22,6 +22,7 @@
     }
   },
 
+  "kv_namespaces": [{"binding":"NOWPULSE_KV","id":"184c64ea1ed443e1bac081453cd599bf"}],
   "vars": {
     "NOWPULSE_AI_REPAIR_MODE": "auto",
     "NOWPULSE_GITHUB_REPO": "Taha8880/NowPulse",
