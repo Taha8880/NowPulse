@@ -72,22 +72,26 @@ jobs:
           console.log('AI Manager Wrangler configuration is valid');
           "
 
-      - name: Deploy AI Manager
+      - name: Create temporary secrets file
         run: |
-          npx wrangler deploy --config ai-manager.wrangler.jsonc
+          printf 'GITHUB_TOKEN=%s\n' "$NOWPULSE_GITHUB_TOKEN" > .secrets.ci
+          chmod 600 .secrets.ci
+        env:
+          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
+
+      - name: Deploy AI Manager with secret
+        run: |
+          npx wrangler deploy \
+            --config ai-manager.wrangler.jsonc \
+            --secrets-file .secrets.ci
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Install GitHub Token Secret
+      - name: Remove temporary secrets file
+        if: always()
         run: |
-          printf '%s' "$NOWPULSE_GITHUB_TOKEN" | \
-          npx wrangler secret put GITHUB_TOKEN \
-            --config ai-manager.wrangler.jsonc
-        env:
-          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          rm -f .secrets.ci
 
       - name: Verify deployment
         run: |
