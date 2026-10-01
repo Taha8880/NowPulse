@@ -46,8 +46,8 @@ jobs:
       - name: Validate product contract
         run: |
           set -euo pipefail
-          grep -q 'const VERSION = "6.1.1"' src/worker.js
-          grep -q 'img:v6:' src/worker.js
+          grep -q 'const VERSION = "6.1.2"' src/worker.js
+          grep -q 'img:v10:' src/worker.js
           grep -q 'wikipediaImage' src/worker.js
           grep -q 'getAgentByName' src/worker.js
           grep -q 'gdeltImage' src/worker.js
