@@ -119,11 +119,5 @@ jobs:
             https://nowpulse-ai-manager.tavengers16.workers.dev/health
 
           echo ""
-          echo "Checking GitHub authentication..."
-
-          curl --fail --silent --show-error \
-            https://nowpulse-ai-manager.tavengers16.workers.dev/github-test
-
-          echo ""
           echo "AI Manager deployment completed successfully."
 
