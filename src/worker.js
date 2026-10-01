@@ -3,7 +3,7 @@ import { getAgentByName } from "agents";
 import { NowPulseMaintenanceWorkflow } from "./nowpulse-maintenance-workflow.js";
 const VERSION = "6.1.5";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
-const AI_MODEL = "@cf/zai-org/glm-5.2";
+const AI_MODEL = "@cf/zai-org/glm-4.7-flash";
 const AI_FALLBACK_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const MAX_LATEST = 120;
 const ARCHIVE_DAYS = 14;
@@ -141,7 +141,7 @@ function normalizeArticle(raw,category){
   const detected=classify(a.title,"");
   a.category=category==="latest"?detected:(category&&CATEGORIES[category]?category:detected);
   if(a.category==="tech"&&!/technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي|اتصالات|هاتف|رقمي|منصة|تطبيق|روبوت|برمجيات/i.test(a.title))a.category=detected;
-  a.id=a.id||makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";a.image=a.originalImage||"";
+  a.id=makeId(a);a.originalImage=/^https?:\/\//i.test(a.originalImage||"")?a.originalImage:"";a.image=a.originalImage||"";
   const rt=(a.title+" "+a.source).toLowerCase();
   a.region=/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(rt)?"egypt":/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(rt)?"arab":"world";
   return a;
@@ -167,7 +167,7 @@ async function fetchHtmlNews(url,category){try{
 }catch{return[]}}
 async function fetchFeed(category,url){try{const r=await timeoutFetch(url,{headers:{accept:"application/rss+xml, application/xml, text/xml","user-agent":"Mozilla/5.0 NowPulse/6.1 (+https://nowpulse.tavengers16.workers.dev/)","cache-control":"no-cache"}});if(!r.ok)return[];const cutoff=Date.now()-FRESH_HOURS*3600000;return xmlItems(await r.text()).filter(x=>new Date(x.date).getTime()>=cutoff).map(x=>normalizeArticle(x,category));}catch{return[];}}
 function newsPriority(a){const t=(a.title+" "+a.source).toLowerCase();if(a.category==="politics")return 3;if(a.region==="egypt"||a.category==="egypt"||/مصر|القاهرة|الإسكندرية|الجيزة|الغردقة|الأقصر|egypt|cairo|alexandria|giza|hurghada|luxor/.test(t))return 100;if(a.region==="arab"||/السعودية|الإمارات|قطر|الكويت|البحرين|عمان|العراق|الأردن|لبنان|سوريا|فلسطين|المغرب|الجزائر|تونس|ليبيا|موريتانيا|السودان|اليمن|الصومال|saudi|uae|qatar|kuwait|bahrain|oman|iraq|jordan|lebanon|syria|palestine|morocco|algeria|tunisia|libya|mauritania|sudan|yemen|somalia/.test(t))return 50;return 0;}
-async function loadFeed(env,force=false,lang="ar"){const feedKey="feed:latest:v2:"+lang;const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(feedKey,"json").catch(()=>null):null;if(!force&&Array.isArray(cached)&&cached.length)return cached;const feeds=lang==="en"?FEEDS_EN:FEEDS;const groups=await Promise.all(feeds.map(([cat,u])=>fetchFeed(cat,u)));const map=new Map();for(const g of groups)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);let items=[...map.values()];if(items.length<10){const direct=await Promise.all(DIRECT_FALLBACK_FEEDS.map(([cat,u])=>fetchFeed(cat,u)));for(const g of direct)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const htmlFallback=await Promise.all(["https://english.ahram.org.eg/","https://www.aljazeera.net/","https://www.aljazeera.com/"].map(u=>fetchHtmlNews(u,"world")));for(const g of htmlFallback)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const fallback=lang==="en"?await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor)","egypt","en"):await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor OR مصر OR القاهرة OR الإسكندرية)","egypt","ar");for(const a of fallback)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}items=dedupeArticles([...map.values()]).sort((a,b)=>((newsPriority(b)-newsPriority(a))*86400000+(new Date(b.date).getTime()-new Date(a.date).getTime()))).slice(0,MAX_LATEST);if(env.NOWPULSE_KV&&items.length)await env.NOWPULSE_KV.put(feedKey,JSON.stringify(items),{expirationTtl:300}).catch(()=>{});return items;}
+async function loadFeed(env,force=false,lang="ar"){const feedKey="feed:latest:v3:"+lang;const cached=env.NOWPULSE_KV?await env.NOWPULSE_KV.get(feedKey,"json").catch(()=>null):null;if(!force&&Array.isArray(cached)&&cached.length)return cached;const feeds=lang==="en"?FEEDS_EN:FEEDS;const groups=await Promise.all(feeds.map(([cat,u])=>fetchFeed(cat,u)));const map=new Map();for(const g of groups)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);let items=[...map.values()];if(items.length<10){const direct=await Promise.all(DIRECT_FALLBACK_FEEDS.map(([cat,u])=>fetchFeed(cat,u)));for(const g of direct)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const htmlFallback=await Promise.all(["https://english.ahram.org.eg/","https://www.aljazeera.net/","https://www.aljazeera.com/"].map(u=>fetchHtmlNews(u,"world")));for(const g of htmlFallback)for(const a of g)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}if(map.size<10){const fallback=lang==="en"?await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor)","egypt","en"):await gdeltFeed("(Egypt OR Cairo OR Alexandria OR Giza OR Hurghada OR Luxor OR مصر OR القاهرة OR الإسكندرية)","egypt","ar");for(const a of fallback)if(!map.has(a.link||a.title))map.set(a.link||a.title,a);}items=dedupeArticles([...map.values()]).sort((a,b)=>((newsPriority(b)-newsPriority(a))*86400000+(new Date(b.date).getTime()-new Date(a.date).getTime()))).slice(0,MAX_LATEST);if(env.NOWPULSE_KV&&items.length)await env.NOWPULSE_KV.put(feedKey,JSON.stringify(items),{expirationTtl:300}).catch(()=>{});return items;}
 async function loadCategoryFeed(env,category,lang="ar"){
   if(!CATEGORIES[category]||category==="latest")return[];
   const feeds=lang==="en"?FEEDS_EN:FEEDS;
@@ -293,7 +293,7 @@ async function localizeArticle(env,a,lang="ar"){
     {role:"user",content:JSON.stringify({title:a.title,description:a.description||""})}
   ],max_tokens:500,temperature:0.05};
   try{
-    const raw=aiText(await env.AI.run(AI_MODEL,prompt,{temperature:0.05,max_completion_tokens:700})).trim().replace(/^```json\s*/i,"").replace(/\s*```$/,"");
+    let raw="";try{raw=aiText(await env.AI.run(AI_MODEL,prompt,{temperature:0.05,max_completion_tokens:700}));}catch{raw=aiText(await env.AI.run(AI_FALLBACK_MODEL,prompt));}raw=raw.trim().replace(/^```json\s*/i,"").replace(/\s*```$/,"");
     const x=JSON.parse(raw);
     if(x?.title){
       const localized={title:cleanText(x.title),description:cleanText(x.description||a.description||"")};
@@ -317,11 +317,11 @@ function htmlArticleText(html){
       for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
     }catch{}
   }
-  const p=[...src.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
-  bodies.push(p.join("\\n"));
+  const p=[...src.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
+  bodies.push(p.join("\n"));
   for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
   const junk=/^(?:primary page extract|news source|listen|save|share|recommended stories|advertisement|add .* on google|social media|share-nodes|facebook|whatsapp|copylink|google|info)$/i;
-  const cleaned=bodies.map(cleanText).map(x=>x.replace(/\\s+/g," ").replace(/(?:Listen|Save|Share|Advertisement|Recommended Stories|Add .*? on Google|social media|share-nodes|facebook|whatsapp|copylink|google|info)(?:\\s|$)/gi," ").trim()).filter(x=>x.length>=100&&!junk.test(x));
+  const cleaned=bodies.map(cleanText).map(x=>x.replace(/\s+/g," ").replace(/(?:Listen|Save|Share|Advertisement|Recommended Stories|Add .*? on Google|social media|share-nodes|facebook|whatsapp|copylink|google|info)(?:\\s|$)/gi," ").trim()).filter(x=>x.length>=100&&!junk.test(x));
   return cleaned.sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
 }
 async function sourceEvidence(article,env,lang="ar"){const evidence=[];if(article.description)evidence.push("FEED DESCRIPTION:\n"+article.description);try{const r=await timeoutFetch(article.link,{redirect:"follow",headers:{"user-agent":"Mozilla/5.0 NowPulse/7.0","accept":"text/html,application/xhtml+xml,text/plain"}},9000);if(r.ok){const t=htmlArticleText(await r.text());if(t.length>=500)evidence.push("PRIMARY PAGE EXTRACT:\n"+t.slice(0,14000));}}catch{}try{const ext=await externalSearchEvidence(env,article.title,lang);const rel=ext.results.filter(x=>x.link&&x.link!==article.link).slice(0,8);if(rel.length)evidence.push("INDEPENDENT EXTERNAL COVERAGE:\n"+rel.map(x=>x.source+" | "+x.title+"\n"+(x.description||"")+"\n"+(x.link||"")).join("\n\n"));}catch{}return evidence.join("\n\n").slice(0,26000)}
