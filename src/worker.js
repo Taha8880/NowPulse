@@ -253,7 +253,7 @@ function htmlArticleText(html){
 }
 async function sourceEvidence(article,env,lang="ar"){const evidence=[];if(article.description)evidence.push("FEED DESCRIPTION:\n"+article.description);try{const r=await timeoutFetch(article.link,{redirect:"follow",headers:{"user-agent":"Mozilla/5.0 NowPulse/7.0","accept":"text/html,application/xhtml+xml,text/plain"}},9000);if(r.ok){const t=htmlArticleText(await r.text());if(t.length>=500)evidence.push("PRIMARY PAGE EXTRACT:\n"+t.slice(0,14000));}}catch{}try{const ext=await externalSearchEvidence(env,article.title,lang);const rel=ext.results.filter(x=>x.link&&x.link!==article.link).slice(0,8);if(rel.length)evidence.push("INDEPENDENT EXTERNAL COVERAGE:\n"+rel.map(x=>x.source+" | "+x.title+"\n"+(x.description||"")+"\n"+(x.link||"")).join("\n\n"));}catch{}return evidence.join("\n\n").slice(0,26000)}
 async function writeArticle(env,article,related,lang="ar"){
-  const cacheKey="article:v2:"+lang+":"+article.id;
+  const cacheKey="article:v3:"+lang+":"+article.id;
   if(env.NOWPULSE_KV){const cached=await env.NOWPULSE_KV.get(cacheKey).catch(()=>null);if(cached&&cached.length>600)return cached;}
   const evidence=await sourceEvidence(article,env,lang);
   if(!env.AI)return fallbackArticle(article,evidence);
