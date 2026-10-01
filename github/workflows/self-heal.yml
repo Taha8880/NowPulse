@@ -269,7 +269,10 @@ jobs:
           echo "Health endpoint: OK"
           echo "Sitemap: OK"
           echo "Robots: OK"
-          echo "Search: OK"\n          echo "AdSense ads.txt: OK"\n          echo "Markets API: OK"\n          echo "Image smoke-test: OK"
+          echo "Search: OK"
+          echo "AdSense ads.txt: OK"
+          echo "Markets API: OK"
+          echo "Image smoke-test: OK"
           echo "======================================"
 
   repair:
