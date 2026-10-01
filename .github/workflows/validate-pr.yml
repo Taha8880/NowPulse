@@ -40,6 +40,28 @@ jobs:
       - name: Validate package scripts
         run: npm run check
 
+      - name: Validate product contract
+        run: |
+          set -euo pipefail
+          grep -q 'const VERSION = "6.0.0"' src/worker.js
+          grep -q 'img:v5:' src/worker.js
+          grep -q 'wikipediaImage' src/worker.js
+          grep -q 'gdeltImage' src/worker.js
+          grep -q 'api.frankfurter.dev/v2/rates' src/worker.js
+          grep -q 'api.goldprice.dev/v1/carat' src/worker.js
+          grep -q 'provider.fx' src/worker.js
+          grep -q 'sourceEvidence' src/worker.js
+          grep -q 'PRIMARY SOURCE EVIDENCE' src/worker.js
+          grep -q 'story-hub' src/worker.js
+          grep -q 'Created by Taha' src/worker.js
+          grep -q 'google.com, pub-1235197294708204' src/worker.js
+          grep -q '@cf/zai-org/glm-5.2' ai-manager.js
+          grep -q '@cf/meta/llama-3.1-8b-instruct-fast' ai-manager.js
+          if grep -q 'const category=url.searchParams.get("category")||"latest",items=await loadFeed(env,false,lang),enriched=' src/worker.js; then
+            echo 'Homepage must not block on bulk image enrichment.'
+            exit 1
+          fi
+          echo 'NowPulse product contract passed.'
       - name: Validate required files
         run: |
           test -f src/worker.js
