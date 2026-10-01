@@ -1204,7 +1204,7 @@ async function runtimeInspection(){
   }
   const home=checks.find(x=>x.path==="/?lang=ar");
   const articleLinks=[];
-  if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\\/article\\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
+  if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\/article\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
   const articleChecks=[];
   for(const path of articleLinks){
     try{
