@@ -108,7 +108,9 @@ jobs:
               if(!d.success) throw new Error("Cloudflare Workflow lookup failed");
               if(d.result?.name!=="nowpulse-maintenance") throw new Error("Workflow name mismatch");
               if(d.result?.script_name!=="nowpulse") throw new Error("Workflow script mismatch");
-              console.log("Cloudflare maintenance Workflow lookup verified.");
+              const schedules=d.result?.schedules||[];
+              if(!schedules.some(s=>s?.cron==="*/15 * * * *")) throw new Error("Workflow 15-minute schedule is missing.");
+              console.log("Cloudflare maintenance Workflow lookup verified with */15 * * * * schedule.");
             });
           '
 
