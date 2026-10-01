@@ -307,9 +307,9 @@ async function localizeArticle(env,a,lang="ar"){
 function relatedFor(article,items){const stop=new Set(["من","في","على","عن","إلى","مع","هذا","هذه","ذلك","التي","الذي","the","and","for","with","from","news","بعد","قبل","اليوم","أمس"]);const tokens=new Set(cleanText(article.title).toLowerCase().split(/\s+/).map(x=>x.replace(/[^\p{L}\p{N}]/gu,"")).filter(x=>x.length>3&&!stop.has(x)));return items.filter(x=>x.id!==article.id).map(x=>{const xt=cleanText(x.title).toLowerCase().split(/\s+/).map(t=>t.replace(/[^\p{L}\p{N}]/gu,""));const score=xt.reduce((n,t)=>n+(tokens.has(t)?1:0),0);return{...x,score};}).filter(x=>x.score>=2).sort((a,b)=>b.score-a.score).slice(0,5);}
 function htmlArticleText(html){
   let src=String(html||"");
-  src=src.replace(/<script[\\s\\S]*?<\\/script>/gi,"").replace(/<style[\\s\\S]*?<\\/style>/gi,"");
-  src=src.replace(/<(nav|header|footer|aside|form|button)[^>]*>[\\s\\S]*?<\\/\\1>/gi,"");
-  src=src.replace(/<([a-z0-9]+)[^>]*(?:class|id)=["'][^"']*(?:share|social|recommend|related|breadcrumb|menu|navigation|subscribe|newsletter|advert|promo|cookie|footer|header)[^"']*["'][^>]*>[\\s\\S]*?<\\/\\1>/gi,"");
+  src=src.replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"");
+  src=src.replace(/<(nav|header|footer|aside|form|button)[^>]*>[\s\S]*?<\/\1>/gi,"");
+  src=src.replace(/<([a-z0-9]+)[^>]*(?:class|id)=["'][^"']*(?:share|social|recommend|related|breadcrumb|menu|navigation|subscribe|newsletter|advert|promo|cookie|footer|header)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,"");
   const bodies=[];
   for(const m of String(html||"").matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
     try{
