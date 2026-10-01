@@ -88,7 +88,7 @@ function cleanText(v){let s=String(v??"");for(let i=0;i<3;i++)s=s.replace(/&(#x[
 const stripHtml=cleanText;
 const isoDate=v=>{const d=new Date(v||0);return Number.isNaN(d.getTime())?new Date().toISOString():d.toISOString();};
 function timeoutFetch(url,init={},ms=FETCH_TIMEOUT){const c=new AbortController();const t=setTimeout(()=>{try{c.abort("timeout")}catch{}},ms);return fetch(url,{...init,signal:c.signal}).finally(()=>clearTimeout(t));}
-function between(xml,tag){const m=String(xml).match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)</"+tag+">","i"));return m?m[1]:"";}
+function between(xml,tag){const m=String(xml).match(new RegExp("<"+tag+"[^>]*>([\s\S]*?)</"+tag+">","i"));return m?m[1]:"";}
 function xmlItems(xml){const out=[];for(const block of String(xml).match(/<item\b[\s\S]*?<\/item>/gi)||[]){const title=stripHtml(between(block,"title")),link=stripHtml(between(block,"link")),date=isoDate(stripHtml(between(block,"pubDate")||between(block,"dc:date"))),description=stripHtml(between(block,"description")),source=stripHtml(between(block,"source"));const media=block.match(/<(?:media:content|media:thumbnail)[^>]+url=["']([^"']+)["']/i);const enclosure=block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);const image=media?.[1]||enclosure?.[1]||"";if(title&&link)out.push({title,link,description,source,date,originalImage:image});}return out;}
 function classify(title,category){if(category&&CATEGORIES[category])return category;const v=String(title).toLowerCase();if(/football|soccer|match|goal|premier|champions|sport|محمد صلاح|أهلي|زمالك/.test(v))return"sports";if(/stock|market|gold|oil|economy|business|bank|currency|اقتصاد|ذهب|دولار/.test(v))return"economy";if(/technology|tech|ai|apple|google|microsoft|iphone|تكنولوجيا|ذكاء اصطناعي/.test(v))return"tech";if(/health|medical|hospital|doctor|صحة|طب/.test(v))return"health";if(/movie|film|music|actor|actress|entertainment|فن|فيلم|مسلسل/.test(v))return"arts";if(/travel|tourism|flight|airport|سياحة|سفر|طيران/.test(v))return"travel";if(/president|government|election|minister|politic|رئيس|حكومة|انتخابات|سياسة/.test(v))return"politics";return"world";}
 function makeId(a){return(`${a.category}-${a.title}-${a.link}`.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-+|-+$/g,"").slice(0,100))+"-"+new Date(a.date).getTime();}
@@ -132,15 +132,15 @@ function relatedFor(article,items){const stop=new Set(["من","في","على","�
 function htmlArticleText(html){
   const src=String(html||"");
   const bodies=[];
-  for(const m of src.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
+  for(const m of src.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){
     try{
       const d=JSON.parse(m[1].trim());
       const arr=Array.isArray(d)?d:[d];
       for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
     }catch{}
   }
-  const p=[...src.matchAll(/<p\b[^>]*>([\\s\\S]*?)<\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
-  bodies.push(p.join("\\n"));
+  const p=[...src.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(x=>cleanText(x[1])).filter(x=>x.length>=45);
+  bodies.push(p.join("\n"));
   for(const tag of ["article","main"]){const m=src.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));if(m)bodies.push(cleanText(m[1]));}
   return bodies.map(cleanText).sort((a,b)=>b.length-a.length)[0]?.slice(0,18000)||"";
 }
