@@ -91,7 +91,7 @@ jobs:
           set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN:-}"
           test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
-          payload='{"class_name":"NowPulseMaintenanceWorkflow","script_name":"nowpulse","cron":"*/15 * * * *"}'
+          payload='{"class_name":"NowPulseMaintenanceWorkflow","script_name":"nowpulse","schedules":[{"cron":"*/15 * * * *"}]}'
           response="$(curl -fsSL --max-time 30             -X PUT             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data "$payload"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
           echo "$response" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
