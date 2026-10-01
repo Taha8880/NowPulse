@@ -19,11 +19,14 @@ const wrangler=read("wrangler.jsonc");
 const ai=read("ai-manager.js");
 const aiCfg=read("ai-manager.wrangler.jsonc");
 const checks=[
-  ['worker version',worker.includes('const VERSION = "6.1.1"')],
+  ['worker version',worker.includes('const VERSION = "6.1.2"')],
   ['RSS parser',worker.includes('function between(xml,tag)')],
   ['GDELT fallback',worker.includes('gdeltFeed')],
   ['semantic image fallback',worker.includes('wikipediaImage')&&worker.includes('wikimediaImage')],
-  ['markets FX',worker.includes('api.frankfurter.dev/v2/rates')],
+  ['markets FX',worker.includes('api.frankfurter.dev/v2/rates')&&worker.includes('chfEgp')],
+  ['search query cache',worker.includes('search:v11:')&&worker.includes('encodeURIComponent(q.toLowerCase())')],
+  ['weather cache',worker.includes('weather:v2:')],
+  ['image cache',worker.includes('img:v10:')],
   ['markets gold',worker.includes('api.goldprice.dev/v1/carat')],
   ['article evidence',worker.includes('sourceEvidence')&&worker.includes('PRIMARY SOURCE EVIDENCE')],
   ['story hub',worker.includes('story-hub')],
