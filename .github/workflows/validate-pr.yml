@@ -53,6 +53,10 @@ jobs:
           grep -q 'gdeltImage' src/worker.js
           grep -q 'api.frankfurter.dev/v2/rates' src/worker.js
           grep -q 'api.goldprice.dev/v1/carat' src/worker.js
+          grep -q 'search:v11:' src/worker.js
+          grep -q 'weather:v2:' src/worker.js
+          grep -q 'img:v10:' src/worker.js
+          grep -q 'chfEgp' src/worker.js
           grep -q 'provider.fx' src/worker.js
           grep -q 'sourceEvidence' src/worker.js
           grep -q 'PRIMARY SOURCE EVIDENCE' src/worker.js
