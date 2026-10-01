@@ -51,15 +51,23 @@ jobs:
 
       - name: Validate autonomous architecture
         run: |
-          set -euo pipefail
-          grep -q 'NowPulseGuardian' wrangler.jsonc
-          grep -q 'NowPulseMaintenanceWorkflow' wrangler.jsonc
-          grep -q '"type": "workflow"' wrangler.jsonc
-          grep -q '"schedules"' wrangler.jsonc
-          grep -Fq '*/15 * * * *' wrangler.jsonc
-          grep -q 'NOWPULSE_GITHUB_TOKEN' src/nowpulse-maintenance-workflow.js
-          grep -q 'getAgentByName' src/nowpulse-maintenance-workflow.js
-          echo "Autonomous architecture contract passed."
+          node <<'NODE'
+          const fs = require("fs");
+          const w = fs.readFileSync("wrangler.jsonc", "utf8");
+          const wf = fs.readFileSync("src/nowpulse-maintenance-workflow.js", "utf8");
+          for (const [name, source, needle] of [
+            ["Guardian export", w, "NowPulseGuardian"],
+            ["Workflow export", w, "NowPulseMaintenanceWorkflow"],
+            ["Workflow type", w, '"type": "workflow"'],
+            ["Workflow schedules", w, '"schedules"'],
+            ["15-minute schedule", w, "*/15 * * * *"],
+            ["GitHub secret access", wf, "NOWPULSE_GITHUB_TOKEN"],
+            ["Guardian agent access", wf, "getAgentByName"]
+          ]) {
+            if (!source.includes(needle)) throw new Error("Missing autonomous contract: " + name);
+          }
+          console.log("Autonomous architecture contract passed.");
+          NODE
 
       - name: Install GitHub token on NowPulse Worker
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
