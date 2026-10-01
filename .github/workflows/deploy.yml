@@ -102,6 +102,7 @@ jobs:
           '
           sleep 5
           body="$(curl -fsSL --max-time 20             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workflows/nowpulse-maintenance")"
+          echo "$body" | tee /tmp/nowpulse-workflow.json
           echo "$body" | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
               const d=JSON.parse(s);
