@@ -87,7 +87,8 @@ jobs:
           grep -q 'binding' wrangler.jsonc
           grep -q 'binding' ai-manager.wrangler.jsonc
           grep -q 'NowPulseGuardian' wrangler.jsonc
-          grep -q 'NowPulseMaintenanceWorkflow' wrangler.jsonc
+          grep -q 'NowPulseMaintenanceWorkflow' src/nowpulse-maintenance-workflow.js
+          test -f .github/workflows/trigger-maintenance.yml
           grep -q 'nodejs_compat' wrangler.jsonc
 
       - name: Validate ads.txt implementation
