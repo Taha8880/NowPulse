@@ -54,5 +54,17 @@ jobs:
           test "$code" = "200"
           grep -q 'NowPulse' /tmp/search
 
+      - name: Trigger AI repair when production checks pass
+        if: ${{ success() && secrets.NOWPULSE_GITHUB_TOKEN != '' }}
+        env:
+          AI_MANAGER_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
+        run: |
+          set -e
+          curl -fsS --max-time 30 \
+            -X POST \
+            -H "Authorization: Bearer $AI_MANAGER_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://nowpulse-ai-manager.tavengers16.workers.dev/repair
+
       - name: Healthy
         run: echo 'NowPulse production monitoring passed.'
