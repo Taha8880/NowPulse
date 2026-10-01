@@ -28,7 +28,8 @@ jobs:
           node-version: 22
 
       - name: Check AI Manager syntax
-        run: node --check ai-manager.js
+        run: |
+          node --check ai-manager.js
 
       - name: Validate required files
         run: |
@@ -39,8 +40,10 @@ jobs:
         run: |
           node -e "
           const fs = require('fs');
-          const text = fs.readFileSync('ai-manager.wrangler.jsonc', 'utf8');
-          const config = JSON.parse(text);
+
+          const config = JSON.parse(
+            fs.readFileSync('ai-manager.wrangler.jsonc', 'utf8')
+          );
 
           if (config.name !== 'nowpulse-ai-manager') {
             throw new Error('Wrong Worker name');
@@ -54,11 +57,20 @@ jobs:
             throw new Error('Workers AI binding is missing');
           }
 
-          if (
-            !config.vars ||
-            config.vars.NOWPULSE_GITHUB_REPO !== 'Taha8880/NowPulse'
-          ) {
-            throw new Error('GitHub repository configuration is missing');
+          if (!config.vars) {
+            throw new Error('Worker vars are missing');
+          }
+
+          if (config.vars.NOWPULSE_GITHUB_REPO !== 'Taha8880/NowPulse') {
+            throw new Error('Wrong GitHub repository');
+          }
+
+          if (config.vars.NOWPULSE_GITHUB_BRANCH !== 'main') {
+            throw new Error('Wrong GitHub branch');
+          }
+
+          if (config.vars.NOWPULSE_WORKER_FILE !== 'src/worker.js') {
+            throw new Error('Wrong Worker file');
           }
 
           if (
@@ -66,45 +78,64 @@ jobs:
             !Array.isArray(config.secrets.required) ||
             !config.secrets.required.includes('GITHUB_TOKEN')
           ) {
-            throw new Error('GITHUB_TOKEN must be declared as a required secret');
+            throw new Error('GITHUB_TOKEN is not declared as required');
           }
 
-          console.log('AI Manager Wrangler configuration is valid');
+          console.log('Wrangler configuration is valid.');
           "
 
-      - name: Create temporary secrets file
+      - name: Validate GitHub secret
         run: |
-          printf 'GITHUB_TOKEN=%s\n' "$NOWPULSE_GITHUB_TOKEN" > .secrets.ci
-          chmod 600 .secrets.ci
+          if [ -z "$NOWPULSE_GITHUB_TOKEN" ]; then
+            echo "ERROR: NOWPULSE_GITHUB_TOKEN is missing from GitHub Actions Secrets."
+            exit 1
+          fi
+
+          echo "GitHub Actions secret is available."
+
         env:
           NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
 
-      - name: Deploy AI Manager with secret
+      - name: Deploy AI Manager
         run: |
           npx wrangler deploy \
-            --config ai-manager.wrangler.jsonc \
-            --secrets-file .secrets.ci
+            --config ai-manager.wrangler.jsonc
+
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Remove temporary secrets file
-        if: always()
+      - name: Install GITHUB_TOKEN on Cloudflare
         run: |
-          rm -f .secrets.ci
+          printf '%s' "$NOWPULSE_GITHUB_TOKEN" \
+            | npx wrangler secret put GITHUB_TOKEN \
+              --config ai-manager.wrangler.jsonc
 
-      - name: Verify deployment
+        env:
+          NOWPULSE_GITHUB_TOKEN: ${{ secrets.NOWPULSE_GITHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify AI Manager
         run: |
-          sleep 8
+          sleep 10
 
-          echo "Checking AI Manager health..."
+          echo "======================================"
+          echo "Checking AI Manager health"
+          echo "======================================"
+
           curl --fail --silent --show-error \
             https://nowpulse-ai-manager.tavengers16.workers.dev/health
 
           echo ""
-          echo "Checking GitHub token..."
+          echo "======================================"
+          echo "Checking GitHub authentication"
+          echo "======================================"
+
           curl --fail --silent --show-error \
             https://nowpulse-ai-manager.tavengers16.workers.dev/github-test
 
           echo ""
-          echo "AI Manager deployment verification completed successfully."
+          echo "======================================"
+          echo "AI Manager deployment completed"
+          echo "======================================"
