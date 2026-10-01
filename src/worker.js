@@ -311,7 +311,7 @@ function htmlArticleText(html){
   src=src.replace(/<(nav|header|footer|aside|form|button)[^>]*>[\s\S]*?<\/\1>/gi,"");
   src=src.replace(/<([a-z0-9]+)[^>]*(?:class|id)=["'][^"']*(?:share|social|recommend|related|breadcrumb|menu|navigation|subscribe|newsletter|advert|promo|cookie|footer|header)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,"");
   const bodies=[];
-  for(const m of String(html||"").matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)){
+  for(const m of String(html||"").matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){
     try{
       const d=JSON.parse(m[1].trim()),arr=Array.isArray(d)?d:[d];
       for(const x of arr){if(typeof x?.articleBody==="string")bodies.push(x.articleBody);for(const g of (x?.["@graph"]||[]))if(typeof g?.articleBody==="string")bodies.push(g.articleBody);}
