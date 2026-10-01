@@ -139,7 +139,16 @@ jobs:
           done
           test "$ok" = "1"
 
-          home="$(curl -fsSL --max-time 20 "$base/")"
+          home_status="$(curl -sS --max-time 20 -o /tmp/nowpulse-home.html -w "%{http_code}" "$base/" || true)"
+          if [ "$home_status" != "200" ]; then
+            echo "Homepage HTTP status: $home_status"
+            echo "Health diagnostic after homepage failure:"
+            curl -fsSL --max-time 20 "$base/health" || true
+            echo "Homepage response:"
+            cat /tmp/nowpulse-home.html || true
+            exit 1
+          fi
+          home="$(cat /tmp/nowpulse-home.html)"
           grep -q 'NowPulse' <<< "$home"
           article_count="$(printf '%s' "$home" | grep -o '/article/' | wc -l | tr -d ' ')"
           test "$article_count" -gt 0
