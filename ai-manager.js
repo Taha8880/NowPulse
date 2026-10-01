@@ -203,7 +203,7 @@ function truncate(value, max = 50000) {
 }
 
 function githubHeaders(env) {
-  const token = env.GITHUB_TOKEN;
+  const token = env.NOWPULSE_GITHUB_TOKEN;
 
   if (!token) {
     throw new Error("NOWPULSE_GITHUB_TOKEN secret is missing.");
