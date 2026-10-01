@@ -206,7 +206,7 @@ function githubHeaders(env) {
   const token = env.GITHUB_TOKEN;
 
   if (!token) {
-    throw new Error("GITHUB_TOKEN secret is missing.");
+    throw new Error("NOWPULSE_GITHUB_TOKEN secret is missing.");
   }
 
   return {
@@ -1682,7 +1682,7 @@ async function runRepair(env) {
 
 async function githubTest(env) {
   const tokenPresent =
-    Boolean(env.GITHUB_TOKEN);
+    Boolean(env.NOWPULSE_GITHUB_TOKEN);
 
   if (!tokenPresent) {
     return {
