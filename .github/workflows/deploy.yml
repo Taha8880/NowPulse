@@ -34,8 +34,37 @@ jobs:
           test -f wrangler.jsonc
           test -f ai-manager.js
 
+      - name: Verify Cloudflare deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "CLOUDFLARE_API_TOKEN is missing"; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
+
       - name: Deploy to Cloudflare
-        run: npx wrangler deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.jsonc
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://nowpulse.tavengers16.workers.dev/health"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if body="$(curl -fsSL --max-time 15 "$url" 2>/dev/null)"; then
+              echo "$body"
+              echo "$body" | grep -q '"ok":true'
+              echo "$body" | grep -q '"service":"NowPulse"'
+              echo "Production health check passed."
+              exit 0
+            fi
+            echo "Health check attempt $attempt/10 failed; waiting 10s..."
+            sleep 10
+          done
+          echo "Production health check failed after deployment."
+          exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
