@@ -57,9 +57,6 @@
       "limits": {
         "steps": 100
       },
-      "schedules": [
-        "*/15 * * * *"
-      ],
       "default_retention": {
         "success_retention": "2 days",
         "error_retention": "7 days"
