@@ -18,7 +18,8 @@ jobs:
           code=$(curl -L -s -o /tmp/home -w '%{http_code}' --max-time 20 https://nowpulse.tavengers16.workers.dev/)
           test "$code" = "200"
           grep -q 'NowPulse' /tmp/home
-          grep -q '6.1.0' /tmp/home
+          grep -q '6.1.1' /tmp/home
+          grep -q '/article/' /tmp/home
 
       - name: Check health
         run: |
