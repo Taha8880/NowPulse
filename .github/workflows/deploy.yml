@@ -37,8 +37,14 @@ jobs:
             if [ "$i" = "18" ]; then exit 1; fi
             sleep 5
           done
-          curl -fsSL "$base/api/news" | grep -q '"'
-          curl -fsSL "$base/api/markets" | grep -q 'usdEgp'
-          curl -fsSL "$base/api/weather?city=cairo" | grep -q 'temperature'
+          news="$(curl -fsSL "$base/api/news")"
+          echo "$news"
+          printf '%s' "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x)||!x.length)process.exit(1)})'
+          markets="$(curl -fsSL "$base/api/markets")"
+          echo "$markets"
+          printf '%s' "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!["usdEgp","eurEgp","gbpEgp","chfEgp","gold24","gold21","gold18"].some(k=>Number(x[k])>0))process.exit(1)})'
+          weather="$(curl -fsSL "$base/api/weather?city=cairo")"
+          echo "$weather"
+          printf '%s' "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Number.isFinite(Number(x.temperature)))process.exit(1)})'
           curl -fsSL "$base/robots.txt" | grep -q 'Sitemap'
           curl -fsSL "$base/sitemap.xml" | grep -q '<urlset'
