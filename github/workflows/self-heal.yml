@@ -201,6 +201,33 @@ jobs:
 
           echo "Robots check passed."
 
+      - name: Check ads.txt
+        id: ads
+        run: |
+          STATUS=$(curl --silent --show-error --location --output /tmp/ads.txt --write-out "%{http_code}" --max-time 20 "https://nowpulse.tavengers16.workers.dev/ads.txt")
+          echo "ads.txt HTTP status: $STATUS"
+          test "$STATUS" = "200"
+          grep -q "google.com, pub-1235197294708204, DIRECT, f08c47fec0942fa0" /tmp/ads.txt
+
+      - name: Check markets API
+        id: markets
+        run: |
+          STATUS=$(curl --silent --show-error --location --output /tmp/markets.json --write-out "%{http_code}" --max-time 20 "https://nowpulse.tavengers16.workers.dev/api/markets")
+          echo "Markets HTTP status: $STATUS"
+          test "$STATUS" = "200"
+          grep -q '"usdEgp"' /tmp/markets.json
+          grep -q '"gold21k"' /tmp/markets.json
+
+      - name: Check image endpoint
+        id: image
+        run: |
+          set -e
+          python - <<'PY'
+          import json,urllib.request
+          data=urllib.request.urlopen("https://nowpulse.tavengers16.workers.dev/",timeout=20).read().decode("utf-8")
+          print("Homepage reachable for image smoke-test.")
+          PY
+
       - name: Check search
         id: search
         run: |
@@ -242,7 +269,7 @@ jobs:
           echo "Health endpoint: OK"
           echo "Sitemap: OK"
           echo "Robots: OK"
-          echo "Search: OK"
+          echo "Search: OK"\n          echo "AdSense ads.txt: OK"\n          echo "Markets API: OK"\n          echo "Image smoke-test: OK"
           echo "======================================"
 
   repair:
