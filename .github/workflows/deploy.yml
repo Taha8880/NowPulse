@@ -41,10 +41,11 @@ jobs:
           for i in $(seq 1 18); do
             h=$(curl -fsSL --max-time 15 "$base/health" || true)
             echo "$h"
-            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"7.0.0"'; then ok=1; break; fi
+            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"8.0.0"'; then ok=1; break; fi
             sleep 5
           done
           test "$ok" = 1
           curl -fsSL "$base/api/news" | grep -q '\['
           curl -fsSL "$base/api/markets" | grep -q 'usdEgp'
           curl -fsSL "$base/sitemap.xml" | grep -q '<urlset'
+          curl -fsSL "$base/api/search?q=Egypt" | grep -q '\['
