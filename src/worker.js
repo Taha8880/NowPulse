@@ -302,7 +302,7 @@ async function markets(env){
   const provider={fx:false,gold:false,fxSource:"",goldSource:""};
   let fxFetchedAt=null,goldFetchedAt=null;
   try{
-    const r=await timeoutFetch("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,CHF",{headers:{accept:"application/json","cache-control":"no-cache"}},7000);
+    const r=await timeoutFetch("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,CHF",{headers:{accept:"application/json","cache-control":"no-cache"}},3000);
     if(r.ok){
       const rows=await r.json();
       const rates=Object.fromEntries((Array.isArray(rows)?rows:[]).map(x=>[String(x.quote||"").toUpperCase(),Number(x.rate)||0]));
@@ -317,7 +317,7 @@ async function markets(env){
   }catch{}
   if(!provider.fx){
     try{
-      const r=await timeoutFetch("https://open.er-api.com/v6/latest/USD",{headers:{accept:"application/json","cache-control":"no-cache"}},7000);
+      const r=await timeoutFetch("https://open.er-api.com/v6/latest/USD",{headers:{accept:"application/json","cache-control":"no-cache"}},3000);
       if(r.ok){
         const d=await r.json();
         const rates=d?.rates||{};
@@ -332,7 +332,7 @@ async function markets(env){
     }catch{}
   }
   try{
-    const r=await timeoutFetch("https://api.goldprice.dev/v1/carat?currency=EGP",{headers:{accept:"application/json","cache-control":"no-cache"}},7000);
+    const r=await timeoutFetch("https://api.goldprice.dev/v1/carat?currency=EGP",{headers:{accept:"application/json","cache-control":"no-cache"}},3000);
     if(r.ok){
       const gd=await r.json();
       gold24k=Number(gd.price_gram_24k)||0;
@@ -345,7 +345,7 @@ async function markets(env){
   }catch{}
   if(!provider.gold){
     try{
-      const r=await timeoutFetch("https://api.goldprice.dev/v1/convert?from=XAU&to=EGP&amount=1&unit=gram",{headers:{accept:"application/json","cache-control":"no-cache"}},7000);
+      const r=await timeoutFetch("https://api.goldprice.dev/v1/convert?from=XAU&to=EGP&amount=1&unit=gram",{headers:{accept:"application/json","cache-control":"no-cache"}},3000);
       if(r.ok){
         const gd=await r.json();
         const gram24=Number(gd?.result)||Number(gd?.rate)||Number(gd?.xau?.price)||Number(gd?.price)||0;
