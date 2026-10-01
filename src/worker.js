@@ -2,7 +2,8 @@ import { NowPulseGuardian } from "./ai-guardian.js";
 import { NowPulseMaintenanceWorkflow } from "./nowpulse-maintenance-workflow.js";
 const VERSION = "5.8.0";
 const SITE = "https://nowpulse.tavengers16.workers.dev";
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const AI_MODEL = "@cf/zai-org/glm-5.2";
+const AI_FALLBACK_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const MAX_LATEST = 120;
 const ARCHIVE_DAYS = 14;
 const FRESH_HOURS = 72;
@@ -174,7 +175,9 @@ ${relatedText}
 Write the finished article now. Every factual claim must be grounded in the supplied evidence.`}
   ],max_tokens:3200,temperature:0.15};
   try{
-    let out=aiText(await env.AI.run(AI_MODEL,prompt)).trim();
+    let out="";
+    try { out=aiText(await env.AI.run(AI_MODEL,prompt,{reasoning_effort:"high",temperature:0.2,max_completion_tokens:12000})).trim(); }
+    catch { out=aiText(await env.AI.run(AI_FALLBACK_MODEL,prompt)).trim(); }
     if(out.length<700)out=aiText(await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast",prompt)).trim();
     out=out.replace(/\r/g,"").replace(/^\`\`\`[a-z]*\s*/i,"").replace(/\s*\`\`\`$/,"").replace(/^#+\s*/gm,"").replace(/^[-*•]\s+/gm,"").trim();
     if(out.length<700)throw Error("AI article output too short");
