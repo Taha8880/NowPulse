@@ -1201,42 +1201,48 @@ function cleanAIJson(value) {
 }
 
 async function runtimeInspection(){
-  const paths=["/health","/?lang=ar","/?lang=en","/search?q=Egypt&lang=en","/search?q=مصر&lang=ar","/api/markets","/sitemap.xml","/ads.txt"];
+  const paths=["/health","/?lang=ar","/?lang=en","/?lang=ar&category=sports","/?lang=ar&category=economy","/?lang=ar&category=politics","/search?q=Egypt&lang=en","/search?q=مصر&lang=ar","/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar","/api/markets","/sitemap.xml","/ads.txt"];
   const checks=[]; const imagePaths=new Set();
   for(const path of paths){
     try{
-      const r=await fetch(PRODUCTION_URL+path,{redirect:"follow"}); const body=await r.text();
-      for(const m of body.matchAll(/\/api\/image\?id=([^"'&]+)/gi))if(imagePaths.size<6)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
-      checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
+      const r=await fetch(PRODUCTION_URL+path,{redirect:"follow",cache:"no-store"});
+      const body=await r.text();
+      for(const m of body.matchAll(/\/api\/image\?id=([^"'&]+)/gi))if(imagePaths.size<8)imagePaths.add("/api/image?id="+decodeURIComponent(m[1]));
+      checks.push({path,status:r.status,ok:r.ok,contentType:r.headers.get("content-type")||"",hasNews:/<article\\b|class=["'][^"']*card|news|خبر|أخبار|NowPulse/i.test(body),hasNoNews:/لا توجد أخبار|No recent stories|لم نجد أخبارًا/i.test(body),hasCards:/class=["'][^"']*card/i.test(body),cardCount:(body.match(/class=["'][^"']*\\bcard\\b/gi)||[]).length,hasCardImages:/class=["'][^"']*card-image/i.test(body),hasArticleImage:/class=["'][^"']*article-image/i.test(body),hasRTL:/dir=["']rtl["']/i.test(body),size:body.length,malformedText:/undefined|null|NaN/.test(body),body});
     }catch(e){checks.push({path,status:0,ok:false,error:text(e?.message||e)});}
   }
   for(const imagePath of imagePaths){
-    try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\//i.test(r.headers.get("content-type")||"")});}
+    try{const r=await fetch(PRODUCTION_URL+imagePath,{redirect:"manual",cache:"no-store"});checks.push({path:imagePath,status:r.status,ok:r.status>=200&&r.status<400,contentType:r.headers.get("content-type")||"",imageOk:/^image\\//i.test(r.headers.get("content-type")||"")});}
     catch(e){checks.push({path:imagePath,status:0,ok:false,error:text(e?.message||e)});}
   }
   const home=checks.find(x=>x.path==="/?lang=ar");
+  const sports=checks.find(x=>x.path.includes("category=sports"));
+  const economy=checks.find(x=>x.path.includes("category=economy"));
+  const politics=checks.find(x=>x.path.includes("category=politics"));
   const articleLinks=[];
   if(home?.body)for(const m of home.body.matchAll(/href=["']([^"']*\/article\/[^"']+)["']/gi))if(articleLinks.length<3)articleLinks.push(m[1]);
   const articleChecks=[];
   for(const path of articleLinks){
     try{
-      const r=await fetch(PRODUCTION_URL+(path.startsWith("/")?path:"/"+path),{redirect:"follow"});
+      const r=await fetch(PRODUCTION_URL+(path.startsWith("/")?path:"/"+path),{redirect:"follow",cache:"no-store"});
       const body=await r.text();
-      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-      const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+      const m=body.match(/class=["'][^"']*article-text[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i);
+      const plain=(m?.[1]||"").replace(/<[^>]+>/g," ").replace(/\\s+/g," ").trim();
       articleChecks.push({path,status:r.status,ok:r.ok,hasArticleText:Boolean(m),length:plain.length,filler:/لا توجد معلومات متاحة|No information is available|تعذر استخراج نص المصدر|تتوفر المعلومات الحالية من المصدر المرتبط|سيعاد بناء المادة/i.test(plain)});
     }catch(e){articleChecks.push({path,status:0,ok:false,error:text(e?.message||e)});}
   }
   let markets={ok:false};
-  try{const r=await fetch(PRODUCTION_URL+"/api/markets",{cache:"no-store"});const data=await r.json();markets={ok:r.ok,status:r.status,usdEgp:Number(data.usdEgp||0),eurEgp:Number(data.eurEgp||0),gbpEgp:Number(data.gbpEgp||0),gold24k:Number(data.gold24k||0),gold21k:Number(data.gold21k||0),gold18k:Number(data.gold18k||0),updated:data.updated||null};}
+  try{const r=await fetch(PRODUCTION_URL+"/api/markets",{cache:"no-store"});const data=await r.json();markets={ok:r.ok,status:r.status,usdEgp:Number(data.usdEgp||0),eurEgp:Number(data.eurEgp||0),gbpEgp:Number(data.gbpEgp||0),gold24k:Number(data.gold24k||0),gold21k:Number(data.gold21k||0),gold18k:Number(data.gold18k||0),updated:data.updated||null,provider:data.provider||{}};}
   catch(e){markets={ok:false,error:text(e?.message||e)}}
-  const arSearch=checks.find(x=>x.path==="/search?q=مصر&lang=ar"),enSearch=checks.find(x=>x.path==="/search?q=Egypt&lang=en");
+  const arSearch=checks.find(x=>x.path==="/search?q=مصر&lang=ar"),enSearch=checks.find(x=>x.path==="/search?q=Egypt&lang=en"),nameSearch=checks.find(x=>x.path.includes("محمد%20صلاح"));
   const imageChecks=checks.filter(x=>String(x.path).startsWith("/api/image?"));
   const brokenImages=imageChecks.filter(x=>!x.ok||!x.imageOk).length;
   const marketProblem=!markets.ok||markets.usdEgp<=0||markets.eurEgp<=0||markets.gbpEgp<=0||markets.gold24k<=0||markets.gold21k<=0||markets.gold18k<=0;
+  const categoryProblem=[sports,economy,politics].some(x=>!x?.ok||x.hasNoNews||x.cardCount<1);
+  const searchProblem=!arSearch?.ok||!enSearch?.ok||!nameSearch?.ok||Boolean(arSearch?.hasNoNews&&enSearch?.hasNoNews&&nameSearch?.hasNoNews);
   const articleProblem=articleChecks.some(x=>!x.ok||!x.hasArticleText||x.length<900||x.filler);
-  return {ok:checks.filter(x=>!String(x.path).startsWith("/api/image?")).every(x=>x.ok)&&brokenImages===0&&!marketProblem&&!articleProblem,production:PRODUCTION_URL,checks:checks.map(x=>{const y={...x};delete y.body;return y;}),articleChecks,markets,diagnostics:{newsProblem:Boolean(home?.hasNoNews||home?.size<3000||home?.malformedText),searchProblem:Boolean(arSearch?.hasNoNews||enSearch?.hasNoNews),imageProblem:brokenImages>0||Boolean(home&&!home.hasCardImages),marketProblem,articleProblem,layoutProblem:Boolean(home&&!home.hasCards),brokenImages}};
-}
+  const layoutProblem=Boolean(home&&(!home.hasCards||home.cardCount<3||/grid-template-columns:.*1fr.*1fr.*1fr/i.test(home.body||"")===false))||categoryProblem;
+  return {ok:checks.filter(x=>!String(x.path).startsWith("/api/image?")).every(x=>x.ok)&&brokenImages===0&&!marketProblem&&!articleProblem&&!searchProblem&&!layoutProblem,production:PRODUCTION_URL,checks:checks.map(x=>{const y={...x};delete y.body;return y;}),articleChecks,markets,diagnostics:{newsProblem:Boolean(home?.hasNoNews||home?.size<3000||home?.malformedText),searchProblem,imageProblem:brokenImages>0||Boolean(home&&!home.hasCardImages),marketProblem,articleProblem,layoutProblem,categoryProblem,brokenImages}};}
 async function askAI(
   env,
   inspection,
