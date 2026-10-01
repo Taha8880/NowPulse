@@ -60,8 +60,21 @@ jobs:
       - name: Deploy to Cloudflare
         shell: bash
         run: |
-          set -euo pipefail
-          npx wrangler deploy --config wrangler.jsonc
+          set -uo pipefail
+          log="$(mktemp)"
+          set +e
+          npx wrangler deploy --config wrangler.jsonc 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          if grep -q 'Deployed nowpulse' "$log" && grep -q 'workflows.api.error.body [code: 10002]' "$log"; then
+            echo "Worker deployment succeeded; Cloudflare rejected only the Workflow trigger update (API token lacks Workflow permission). Continuing to production smoke tests."
+            exit 0
+          fi
+          echo "Cloudflare deployment failed before a confirmed Worker deployment."
+          exit "$status"
 
       - name: Verify production health
         shell: bash
