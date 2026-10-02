@@ -1,4 +1,4 @@
-const VERSION="1.6.0";
+const VERSION="1.6.1";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const ADSENSE="ca-pub-1235197294708204";
 export class NowPulseGuardian{constructor(state,env){this.state=state;this.env=env}async fetch(){return new Response(JSON.stringify({ok:true,service:"NowPulseGuardian",version:VERSION}),{headers:{"content-type":"application/json;charset=UTF-8"}})}}
