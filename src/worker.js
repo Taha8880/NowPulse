@@ -31,7 +31,19 @@ function rss(xml,source){
   return bs.map(b=>{const link=url(tag(b,"link")||attr(b,"link","href")),title=strip(tag(b,"title")),d1=strip(tag(b,"description")),d2=strip(tag(b,"content:encoded")),description=strip([d1,d2].filter(Boolean).join(" ")),rd=tag(b,"pubDate")||tag(b,"published")||tag(b,"updated");let date="";if(rd){const d=new Date(rd);if(!Number.isNaN(d.getTime()))date=d.toISOString()}return link&&title?(()=>{const item={title,description,date,link,source:clean(tag(b,"source")||source),image:image(b)};return{id:enc(JSON.stringify(item)),...item}})():null}).filter(Boolean);
 }
 function uniq(a){const s=new Set();return a.filter(x=>{const k=(x.link||x.title).toLowerCase();if(s.has(k))return false;s.add(k);return true})}
-async function searchFeed(q,lang){try{return rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:1d")+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{return[]}}
+async function gdeltFeed(q,lang){
+  try{
+    const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&format=json&maxrecords=30&timespan=72h&sort=datedesc";
+    const d=await getJson(u);
+    return (d.articles||[]).map(x=>({title:strip(x.title||""),description:strip(x.title||""),date:(()=>{const z=String(x.seendate||"");if(/^\\d{14}$/.test(z)){const d=new Date(Date.UTC(+z.slice(0,4),+z.slice(4,6)-1,+z.slice(6,8),+z.slice(8,10),+z.slice(10,12),+z.slice(12,14)));return d.toISOString()}return ""})(),link:url(x.url),source:strip(x.domain||"Web"),image:url(x.socialimage||"")})).filter(x=>x.title&&x.link).map(x=>({id:enc(JSON.stringify(x)),...x}));
+  }catch{return[]}
+}
+async function searchFeed(q,lang){
+  let items=[];
+  try{items=rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{}
+  if(items.length<5){const extra=await gdeltFeed(q,lang);items=uniq(items.concat(extra))}
+  return items;
+}
 async function commons(q){
   try{
     const d=await getJson("https://commons.wikimedia.org/w/rest.php/v1/search/page?q="+encodeURIComponent(clean(q))+"&limit=8");
@@ -96,37 +108,42 @@ function categoryRelevant(x,k,lang){
   if(k==="trends")return trend;
   return false;
 }
+async function readNewsArchive(lang){
+  try{
+    const r=await caches.default.match(new Request(SITE+"/__nowpulse_news_archive?lang="+lang));
+    if(!r)return null;
+    const x=await r.json();return x&&typeof x==="object"?x:null;
+  }catch{return null}
+}
+async function writeNewsArchive(lang,data){
+  try{
+    await caches.default.put(new Request(SITE+"/__nowpulse_news_archive?lang="+lang),new Response(JSON.stringify(data),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}}));
+  }catch{}
+}
 async function loadCategory(k,lang,limit=10){
-  const qs=(CATEGORY_QUERIES[k]||[k]).slice(0,k==="latest"?3:1);
+  const qs=(CATEGORY_QUERIES[k]||[k]).slice(0,k==="latest"?4:3);
   const sets=await Promise.all(qs.map(q=>searchFeed(q,lang)));
   let items=uniq(sets.flat());
   if(k!=="latest"){
     const matched=items.filter(x=>categoryRelevant(x,k,lang));
-    if(matched.length)items=matched;
+    if(matched.length>=3)items=matched;
   }
   items.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-  items=items.slice(0,limit);
-  return items;
+  return items.slice(0,limit);
 }
 async function news(lang){
+  const previous=await readNewsArchive(lang);
   const keys=Object.keys(CATS);
-  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?18:6)]));
-  const out=Object.fromEntries(pairs);
-  const latest=uniq([
-    ...(out.egypt||[]),
-    ...(out.arab||[]),
-    ...(out.politics||[]),
-    ...(out.sports||[]),
-    ...(out.economy||[]),
-    ...(out.tech||[]),
-    ...(out.arts||[]),
-    ...(out.health||[]),
-    ...(out.travel||[]),
-    ...(out.trends||[]),
-    ...(out.world||[])
-  ]);
-  latest.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-  out.latest=latest.slice(0,18);
+  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?24:8)]));
+  const fresh=Object.fromEntries(pairs);
+  const out={};
+  for(const k of keys){
+    const old=Array.isArray(previous?.[k])?previous[k]:[];
+    out[k]=uniq([...(fresh[k]||[]),...old]).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,k==="latest"?60:24);
+  }
+  const latest=uniq(keys.filter(k=>k!=="latest").flatMap(k=>out[k]||[])).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+  out.latest=uniq([...(fresh.latest||[]),...latest,...(previous?.latest||[])]).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,60);
+  await writeNewsArchive(lang,out);
   return out;
 }
 async function markets(){
