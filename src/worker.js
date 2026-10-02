@@ -89,7 +89,7 @@ async function loadCategory(k,lang,limit=10){
   }
   items.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
   items=items.slice(0,limit);
-  const missing=items.filter(x=>!x.image).slice(0,2);
+  const missing=items.filter(x=>!x.image).slice(0,1);
   if(missing.length){
     const imgs=await Promise.all(missing.map(x=>commons(x.title)));
     missing.forEach((x,i)=>x.image=imgs[i]||"");
