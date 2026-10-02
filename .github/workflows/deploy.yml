@@ -55,7 +55,16 @@ jobs:
           curl -fsSL --max-time 25 "$SITE/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar" -o /tmp/search.html
           grep -q '<html' /tmp/search.html
           grep -q 'NowPulse' /tmp/search.html
-          curl -fsSL --max-time 20 "$SITE/article/test?lang=ar" -o /tmp/article.html
+          image_headers="$(curl -fsSI --max-time 20 "$SITE/api/image?q=football")"
+          echo "$image_headers"
+          echo "$image_headers" | grep -Eiq 'content-type: image/'
+          story_id="$(echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.latest?.[0]?.id)process.exit(1);process.stdout.write(encodeURIComponent(x.latest[0].id))})')"
+          curl -fsSL --max-time 25 "$SITE/article/$story_id?lang=ar" -o /tmp/article.html
           grep -q '<h1>' /tmp/article.html
           grep -q 'article-content' /tmp/article.html
           grep -q 'NowPulse' /tmp/article.html
+          ! grep -Eiq 'news\.google\.com/rss|<a[^>]+href=' /tmp/article.html
+          headers="$(curl -fsSI --max-time 20 "$SITE/?lang=ar")"
+          echo "$headers"
+          echo "$headers" | grep -Eiq 'x-content-type-options: nosniff'
+          echo "$headers" | grep -Eiq 'x-frame-options: DENY'
