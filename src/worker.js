@@ -52,6 +52,13 @@ function enrichOriginalLinks(items,extra){
     return best&&score>=0.55?{...x,link:best.link,source:x.source||best.source,image:x.image||best.image,description:x.description&&x.description!==x.title?x.description:best.description}:x;
   });
 }
+async function directNewsFeed(lang){
+  const feeds=lang==="ar"
+    ? [["BBC Arabic","https://feeds.bbci.co.uk/arabic/rss.xml"]]
+    : [["BBC News","https://feeds.bbci.co.uk/news/rss.xml"]];
+  const sets=await Promise.all(feeds.map(async ([source,u])=>{try{return rss(await getText(u),source)}catch{return[]}}));
+  return uniq(sets.flat().filter(validStory));
+}
 async function searchFeed(q,lang){
   let items=[];
   try{items=rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{}
@@ -59,6 +66,10 @@ async function searchFeed(q,lang){
     const extra=await gdeltFeed(q,lang);
     items=enrichOriginalLinks(items,extra);
     items=uniq(items.concat(extra));
+  }
+  if(items.length<5){
+    const direct=await directNewsFeed(lang);
+    items=uniq(items.concat(direct));
   }
   return uniq(items.filter(validStory));
 }
