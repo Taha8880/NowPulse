@@ -128,6 +128,9 @@ async function markets(){
   }));
   let oz=null;
   try{oz=Number((await getJson("https://api.gold-api.com/price/XAU"))?.price)}catch{}
+  if(!(oz>0)){
+    try{oz=Number((await getJson("https://xaus.com/api/v1/spot?compact=1"))?.spot_usd_oz|| (await getJson("https://xaus.com/api/v1/spot?compact=1"))?.xau?.price)}catch{}
+  }
   const usd=d.fx.usd?.mid;
   if(oz>0&&usd>0){
     const world=oz,egpOz=oz*usd,g24=egpOz/31.1034768;
