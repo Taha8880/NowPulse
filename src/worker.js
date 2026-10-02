@@ -80,7 +80,7 @@ function categoryRelevant(x,k,lang){
   return false;
 }
 async function loadCategory(k,lang,limit=10){
-  const qs=CATEGORY_QUERIES[k]||[k];
+  const qs=(CATEGORY_QUERIES[k]||[k]).slice(0,k==="latest"?3:1);
   const sets=await Promise.all(qs.map(q=>searchFeed(q,lang)));
   let items=uniq(sets.flat());
   if(k!=="latest"){
