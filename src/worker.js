@@ -132,8 +132,8 @@ async function article(l,id){
   const date=dt(x.date,l),source=strip(x.source)||"NowPulse";
   const ar=l==="ar";
 
-  // Build a detailed internal news presentation only from verified metadata/feed text.
-  // No invented facts and no verbatim republication of a third-party article.
+  // Build a detailed, readable internal presentation from verified source data.
+  // Never invent facts or reproduce third-party articles verbatim.
   const sentences=summary
     .replace(/\\s+/g," ")
     .split(/(?<=[.!?؟])\\s+/)
@@ -147,9 +147,7 @@ async function article(l,id){
     if(!text)return "";
     return "<section class='article-section'><h2>"+esc(heading)+"</h2><p class='article-p'>"+esc(text)+"</p></section>";
   };
-  const context=ar
-    ?"هذه الصفحة تجمع المعلومات المتاحة من مصدر الخبر داخل NowPulse في صياغة منظمة. لا تتم إضافة وقائع غير موجودة في البيانات المتاحة، لذلك قد تختلف كمية التفاصيل من خبر لآخر."
-    :"This page organizes the verified information available from the story source inside NowPulse. No unsupported facts are added, so the amount of detail can vary by story.";
+  const context=ar?"المصدر: "+source:"Source: "+source;
 
   const body="<article class='article'>"
     +"<div class='article-top'><span class='source'>"+esc(source)+"</span>"+(date?"<span class='date'>"+esc(date)+"</span>":"")+"</div>"
@@ -160,7 +158,6 @@ async function article(l,id){
     +section(ar?"ملخص الخبر":"News summary",fallback)
     +section(ar?"التفاصيل المتاحة":"Available details",details)
     +section(ar?"معلومات إضافية":"Additional information",remaining)
-    +"<section class='article-section article-note'><h2>"+(ar?"ملاحظة":"Note")+"</h2><p class='article-p'>"+esc(context)+"</p></section>"
     +"</div>"+ad()+"</article>";
   return shell(l,title,"",body,summary||context);
 }
