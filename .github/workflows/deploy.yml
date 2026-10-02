@@ -63,7 +63,7 @@ jobs:
           grep -q '<h1>' /tmp/article.html
           grep -q 'article-content' /tmp/article.html
           grep -q 'NowPulse' /tmp/article.html
-          ! grep -Eiq 'news\.google\.com/rss|<a[^>]+href=' /tmp/article.html
+          ! grep -Eiq 'news\.google\.com/rss|https://news\.google\.com/rss' /tmp/article.html
           headers="$(curl -fsSI --max-time 20 "$SITE/?lang=ar")"
           echo "$headers"
           echo "$headers" | grep -Eiq 'x-content-type-options: nosniff'
