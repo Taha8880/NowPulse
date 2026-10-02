@@ -26,8 +26,13 @@ function rss(xml,source){
 function uniq(a){const s=new Set();return a.filter(x=>{const k=(x.link||x.title).toLowerCase();if(s.has(k))return false;s.add(k);return true})}
 async function searchFeed(q,lang){try{return rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:1d")+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{return[]}}
 async function commons(q){
-  const terms=[clean(q),clean(q).split(/[|،,:-]/)[0],clean(q).split(/\s+/).slice(0,6).join(" ")].filter((x,i,a)=>x&&a.indexOf(x)===i);
-  for(const term of terms){try{const d=await getJson("https://commons.wikimedia.org/w/rest.php/v1/search/page?q="+encodeURIComponent(term)+"&limit=8");for(const p of d.pages||[]){const u=url(p?.thumbnail?.url||p?.original?.url);if(u&&!/logo|icon|flag|sprite|placeholder/i.test(u))return u}}catch{}}
+  try{
+    const d=await getJson("https://commons.wikimedia.org/w/rest.php/v1/search/page?q="+encodeURIComponent(clean(q))+"&limit=6");
+    for(const p of d.pages||[]){
+      const u=url(p?.thumbnail?.url||p?.original?.url);
+      if(u&&!/logo|icon|flag|sprite|placeholder/i.test(u))return u;
+    }
+  }catch{}
   return "";
 }
 async function resolveSource(target){let current=url(target);if(!current)return "";for(let i=0;i<4;i++){try{const r=await fetch(current,{redirect:"manual",headers:{"user-agent":"NowPulse/1.1","accept":"text/html,application/xhtml+xml,*/*"}});if(r.status>=300&&r.status<400){const loc=r.headers.get("location");if(!loc)return current;current=new URL(loc,current).toString();continue}return r.url||current}catch{return current}}return current}
@@ -40,7 +45,7 @@ async function news(lang){
   all.sort((a,b)=>(score(b)-score(a))||((Date.parse(b.date)||0)-(Date.parse(a.date)||0)));
   const out={latest:all.slice(0,18)};for(const k of Object.keys(CATS).filter(k=>k!=="latest"))out[k]=[];
   for(const x of all){const c=classify(x);if(out[c]?.length<8)out[c].push(x);const s=(x.title+" "+x.description).toLowerCase();if((lang==="ar"?/مصر|القاهرة|الغردقة|الأقصر|الإسكندرية/.test(s):/\begypt\b|cairo|hurghada|luxor|alexandria/.test(s))&&out.egypt.length<8)out.egypt.push(x);if((lang==="ar"?/العالم العربي|الدول العربية|السعودية|الإمارات|قطر|الكويت|الأردن|المغرب|تونس|الجزائر|لبنان|العراق/.test(s):/arab|saudi|uae|qatar|kuwait|jordan|morocco|tunisia|algeria|lebanon|iraq/.test(s))&&out.arab.length<8)out.arab.push(x);if(/trend|ترند/.test(s)&&out.trends.length<8)out.trends.push(x);if(out.world.length<8)out.world.push(x)}
-  const missing=all.filter(x=>!x.image).slice(0,24),imgs=await Promise.all(missing.map(x=>commons(x.title)));missing.forEach((x,i)=>x.image=imgs[i]||"");
+  const missing=all.filter(x=>!x.image).slice(0,8);const imgs=await Promise.all(missing.map(x=>commons(x.title)));missing.forEach((x,i)=>x.image=imgs[i]||"");
   return out;
 }
 async function markets(){
