@@ -1,13 +1,9 @@
 {
   "name":"nowpulse",
   "private":true,
+  "version":"1.0.0",
   "description":"NowPulse bilingual news and information platform",
-  "version":"9.0.0",
   "engines":{"node":">=22"},
   "devDependencies":{"wrangler":"^4.146.0"},
-  "scripts":{
-    "check":"node --check src/worker.js",
-    "test:contract":"node scripts/contract-test.mjs",
-    "deploy":"wrangler deploy"
-  }
+  "scripts":{"check":"node --check src/worker.js","test:contract":"node scripts/contract-test.mjs","deploy":"wrangler deploy --config wrangler.jsonc"}
 }
