@@ -365,6 +365,7 @@ function sectionHtml(key,items,lang){
 }
 
 async function home(env,lang){
+ try{
  const ar=lang==="ar";
  const empty={latest:[],egypt:[],arab:[],world:[],politics:[],sports:[],economy:[],tech:[],arts:[],health:[],travel:[],trends:[]};
  const [data,m,w]=await Promise.all([
@@ -378,6 +379,7 @@ async function home(env,lang){
  "<div class='weather'>☁ <span>"+(ar?w.cityAr:w.cityEn)+" · "+(typeof w.temperature==="number"?w.temperature.toFixed(1):"—")+"°C · "+(typeof w.humidity==="number"?w.humidity.toFixed(0):"—")+"%</span></div>"+
  sectionHtml("egypt",data.egypt,lang)+sectionHtml("arab",data.arab,lang)+sectionHtml("world",data.world,lang)+sectionHtml("politics",data.politics,lang)+sectionHtml("sports",data.sports,lang)+sectionHtml("economy",data.economy,lang)+sectionHtml("tech",data.tech,lang);
  return shell(lang,ar?"نبض الآن":"NowPulse","latest",body);
+ }catch(e){ console.error("homepage_error",e?.stack||e); return shell(lang,lang==="ar"?"نبض الآن":"NowPulse","latest","<div class=\"empty\">"+(lang==="ar"?"يتم تحديث البيانات الآن.":"Data is updating now.")+"</div>"); }
 }
 async function categoryPage(env,lang,cat){
  const items=await feed(env,lang,cat);
