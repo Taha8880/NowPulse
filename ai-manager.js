@@ -6,7 +6,7 @@ const MODEL="openai/gpt-6-sol";
 const CATS=["latest","egypt","arab","world","politics","sports","economy","tech","arts","health","travel","trends"];
 
 async function req(url,init={}){const r=await fetch(url,{...init,headers:{"accept":"application/json",...(init.headers||{})}});const t=await r.text();let data={};try{data=JSON.parse(t)}catch{}return{ok:r.ok,status:r.status,data,text:t}}
-async function site(path){try{const r=await fetch(SITE+path,{redirect:"follow",headers:{"user-agent":"NowPulse-AI-Manager/2.0","accept":"text/html,application/json,*/*"}});return{ok:r.ok,status:r.status,text:(await r.text()).slice(0,12000)}}catch(e){return{ok:false,status:0,text:String(e)}}}
+async function site(path){try{const r=await fetch(SITE+path,{redirect:"follow",headers:{"user-agent":"NowPulse-AI-Manager/2.0","accept":"text/html,application/json,*/*"}});return{ok:r.ok,status:r.status,contentType:r.headers.get("content-type")||"",text:(await r.text()).slice(0,12000)}}catch(e){return{ok:false,status:0,text:String(e)}}}
 function b64(s){const a=new TextEncoder().encode(s);let x="";for(let i=0;i<a.length;i+=32768)x+=String.fromCharCode(...a.slice(i,i+32768));return btoa(x)}
 function aiText(x){if(typeof x==="string")return x;if(x?.choices?.[0]?.message)return x.choices[0].message.content||"";if(x?.output_text)return x.output_text;if(x?.response)return x.response;if(Array.isArray(x?.output)){let s="";for(const o of x.output)for(const c of o.content||[])if(c?.text)s+=c.text;return s}return""}
 function codeOnly(s){let x=String(s||"").trim();const m=x.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);return m?m[1].trim():x}
@@ -31,7 +31,7 @@ async function diagnose(){
   d.article=id?await site("/article/"+encodeURIComponent(id)+"?lang=ar"):{ok:false,text:"no article"};
   if(!d.health.ok||!/"ok":true/.test(d.health.text))d.broken.push("health");
   if(!d.news.ok||!Array.isArray(n.latest)||n.latest.length<5)d.broken.push("news");
-  for(const k of ["usdEgp","eurEgp","gbpEgp","gold24","gold21","gold18"])if(!(Number(m[k])>0))d.broken.push("market:"+k);
+  for(const k of ["usd","eur","gbp","sar","aed"])if(!(Number(m.fx?.[k]?.mid)>0))d.broken.push("market:"+k);for(const k of ["24K","21K","18K"])if(!(Number(m.gold?.[k]?.mid)>0))d.broken.push("market:"+k);
   if(!d.search.ok||!d.search.text.includes("نتائج البحث"))d.broken.push("search");
   if(!d.home.text.includes("/api/image?q="))d.broken.push("image-fallback-ui");
   if(/news\.google\.com\/rss\/articles|https:\/\/news\.google\.com\/rss/i.test(d.article.text))d.broken.push("article-wrapper");
@@ -115,7 +115,7 @@ async function verifyProduction(){
   if(!home.ok||!/NowPulse/.test(home.text))issues.push("home");
   if(!n.ok||!Array.isArray(nx.latest)||nx.latest.length<5)issues.push("news");
   if(!m.ok||!(Number(mx.fx?.usd?.mid)>0)||!(Number(mx.gold?.["24K"]?.mid)>0))issues.push("markets");
-  if(!img.ok||!/image\//i.test(img.text.slice(0,200)))issues.push("image");
+  if(!img.ok||!/image\//i.test(img.contentType||""))issues.push("image");
   if(!a.ok||!/<h1>/i.test(a.text)||/news\.google\.com\/rss/i.test(a.text))issues.push("article");
   return{ok:issues.length===0,issues};
 }
@@ -128,7 +128,7 @@ async function run(env,force=false){
   const diag=await diagnose();
   const maintenanceEnabled=env.NOWPULSE_AI_MAINTENANCE!=="disabled";
   let maintenanceDue=false;
-  if(maintenanceEnabled&&env.NOWPULSE_KV){const last=await env.NOWPULSE_KV.get("last-maintenance");maintenanceDue=!last||(Date.now()-Date.parse(last)>21600000)}
+  if(maintenanceEnabled&&env.NOWPULSE_KV){const last=await env.NOWPULSE_KV.get("last-maintenance");maintenanceDue=!last||(Date.now()-Date.parse(last)>3600000)}
   if(!force&&!diag.broken.length&&!maintenanceDue)return{ok:true,action:"healthy",quality:diag.quality};
   if(env.NOWPULSE_KV){const lock=await env.NOWPULSE_KV.get("repair-lock");if(lock&&!force)return{ok:true,action:"cooldown",broken:diag.broken}}
   const snapshot=await repoSnapshot(env);if(!snapshot.ok)return{ok:false,reason:"Repository snapshot failed",detail:snapshot.text};
@@ -152,7 +152,7 @@ async function run(env,force=false){
     await record(env,"last-rollback",{time:new Date().toISOString(),failedCommit:put.sha,changed:Object.keys(changes),deploy,production,rollback:rb});
     return{ok:false,action:"rolled-back",commit:put.sha,rollback:rb,changed:Object.keys(changes),findings:generated.plan.findings||[],postDeploy:production,deploy};
   }
-  if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
+  if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:1800});await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
   return{ok:true,action:mode==="repair"?"repaired":"maintained",commit:put.sha,changed:Object.keys(changes),findings:generated.plan.findings||[],broken:diag.broken,postDeploy:production,deploy};
 }
 export default{
