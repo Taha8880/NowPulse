@@ -30,7 +30,7 @@ jobs:
           health="$(curl -fsSL --max-time 20 "$SITE/health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
-          echo "$health" | grep -q '"version":"1.4.0"'
+          echo "$health" | grep -q '"version":"1.5.0"'
           curl -fsSL --max-time 25 "$SITE/?lang=ar" -o /tmp/home.html
           grep -q 'NowPulse' /tmp/home.html
           curl -fsSL --max-time 25 "$SITE/robots.txt" | grep -q 'Sitemap'
