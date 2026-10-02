@@ -26,7 +26,7 @@ jobs:
           SITE: https://nowpulse.tavengers16.workers.dev
         run: |
           set -e
-          sleep 8
+          sleep 25
           health="$(curl -fsSL --max-time 20 "$SITE/health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
