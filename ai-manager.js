@@ -39,6 +39,10 @@ async function diagnose(){
   if(/<a\b|&lt;\s*a|news\.google\.com\/rss/i.test(raw))d.broken.push("raw-rss");
   if(d.search.text.includes("news.google.com")||/&lt;/.test(d.search.text))d.broken.push("search-rss");
   if(d.home.text.includes("لا توجد صورة من المصدر")||d.home.text.includes("No source image"))d.broken.push("image-ui");
+  if(!d.home.text.includes("class='nav'")||!d.home.text.includes("/category/egypt?lang="))d.broken.push("navigation");
+  if(!d.home.text.includes("class='iconbtn'"))d.broken.push("controls");
+  if(!/animation:float|@keyframes float/.test(d.home.text))d.broken.push("dynamic-background");
+  if(!/dir='(ar|en)'/.test(d.home.text))d.broken.push("direction");
   d.quality.newsWithImages=(n.latest||[]).filter(x=>x.image).length;
   d.quality.imageCoverage=d.quality.newsTotal?Math.round(d.quality.newsWithImages/d.quality.newsTotal*100):0;
   d.quality.newsTotal=(n.latest||[]).length;
@@ -53,7 +57,9 @@ async function generate(env,diag,mode,current){
     ?"Fix every failing production check while preserving existing working behavior."
     :"Perform conservative production maintenance: improve only clear quality/reliability issues visible in the diagnostics. Do not redesign the site, remove routes, remove bilingual behavior, weaken SEO, or replace working APIs without a concrete reason.";
   const rules="You are the senior production engineer for NowPulse. "+mission+" Return ONLY the complete src/worker.js JavaScript source, no Markdown. Keep Cloudflare Workers compatibility and the NowPulseGuardian Durable Object export. Arabic is primary RTL and English must remain complete LTR. Preserve all routes: /health /api/news /api/markets /api/weather /api/image /search /article/* /category/* /robots.txt /sitemap.xml /rss.xml /ads.txt and homepage. Never expose raw RSS HTML/entities or Google News wrapper pages. Every article/card must retain its title, description, source, date, original link and image metadata in an internal story ID so navigation never collapses to a generic event page. The /api/image route must return actual image bytes with an image content-type, not JSON. If a source image is missing, use a relevant Wikimedia Commons image through the proxy and reject logos/icons/placeholders. Verify that category navigation remains category-specific and that every card opens its own story. Article pages must show clean title/source/date/summary/relevant image and an original-source link, not republish full third-party articles. Prefer Egypt and Arab coverage, then world. Use real source images or relevant Wikimedia Commons fallback, never logos. Keep responsive professional formatting, balanced Arabic/English typography, visible controls/icons, dark/light mode, animated category-aware background, page transitions, working internal search, ads, SEO, and footer 'NowPulse · Created by Taha'. Do not add npm dependencies.";
-  const prompt=rules+"\nDiagnostics:\n"+JSON.stringify(diag)+"\nCurrent source:\n"+current;
+  const history=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-change"):null;
+  const rollback=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-rollback"):null;
+  const prompt=rules+"\nDiagnostics:\n"+JSON.stringify(diag)+"\nPrevious change:\n"+String(history||"none")+"\nPrevious rollback:\n"+String(rollback||"none")+"\nCurrent source:\n"+current;
   let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Production Cloudflare Workers repair and maintenance agent."},{role:"user",content:prompt}],max_completion_tokens:30000,temperature:0.05,reasoning_effort:"high"},{gateway:{id:env.NOWPULSE_AI_GATEWAY_ID||"default",skipCache:true,collectLog:true,metadata:{service:"nowpulse-ai-manager",mode}}})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
   const next=codeOnly(aiText(ai));if(!validSource(next))return{ok:false,reason:"AI returned invalid source",length:next.length};
   return{ok:true,next};
