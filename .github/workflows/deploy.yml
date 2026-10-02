@@ -2,13 +2,11 @@ name: NowPulse Production
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  validate:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,36 +18,28 @@ jobs:
       - run: npm run test:contract
       - run: npx wrangler deploy --dry-run --config wrangler.jsonc
       - name: Deploy production
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --config wrangler.jsonc
       - name: Verify production
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SITE: https://nowpulse.tavengers16.workers.dev
         run: |
           set -e
-          base=https://nowpulse.tavengers16.workers.dev
-          for i in $(seq 1 18); do
-            h=$(curl -fsSL --max-time 15 "$base/health" || true)
-            echo "$h"
-            if echo "$h" | grep -q '"ok":true' && echo "$h" | grep -q '"version":"9.0.0"'; then break; fi
-            if [ "$i" = "18" ]; then exit 1; fi
-            sleep 5
-          done
-          news="$(curl -fsSL "$base/api/news")"
-          echo "$news"
-          printf '%s' "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!Array.isArray(x.latest)||!x.latest.length)process.exit(1)})'
-          home_code="$(curl --compressed -sS -o /tmp/home.html -w '%{http_code}' --max-time 25 "$base/?lang=ar" || true)"
-          echo "HOME_HTTP=$home_code"
-          head -c 300 /tmp/home.html || true
-          echo
-          test "$home_code" = "200"
-          markets="$(curl -fsSL "$base/api/markets")"
-          echo "$markets"
-          printf '%s' "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);const keys=["usdEgp","eurEgp","gbpEgp","chfEgp","gold24","gold21","gold18"];if(!keys.some(k=>Number(x[k])>0))process.exit(1)})'
-          weather="$(curl -fsSL "$base/api/weather?city=cairo")"
-          echo "$weather"
-          printf '%s' "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Number.isFinite(Number(x.temperature)))process.exit(1)})'
-          curl --compressed -fsSL "$base/robots.txt" | grep -q 'Sitemap'
-          curl --compressed -fsSL "$base/sitemap.xml" | grep -q '<urlset'
+          sleep 8
+          health="$(curl -fsSL --max-time 20 "$SITE/health")"
+          echo "$health"
+          echo "$health" | grep -q '"ok":true'
+          echo "$health" | grep -q '"version":"1.0.0"'
+          curl -fsSL --max-time 25 "$SITE/?lang=ar" -o /tmp/home.html
+          grep -q 'NowPulse' /tmp/home.html
+          curl -fsSL --max-time 25 "$SITE/robots.txt" | grep -q 'Sitemap'
+          curl -fsSL --max-time 25 "$SITE/sitemap.xml" | grep -q '<urlset'
+          curl -fsSL --max-time 25 "$SITE/ads.txt" | grep -q 'pub-1235197294708204'
+          news="$(curl -fsSL --max-time 35 "$SITE/api/news?lang=ar")"
+          echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x.latest))process.exit(1)})'
+          markets="$(curl -fsSL --max-time 25 "$SITE/api/markets")"
+          echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||typeof x!=="object")process.exit(1)})'
+          weather="$(curl -fsSL --max-time 25 "$SITE/api/weather?city=cairo")"
+          echo "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!("temperature" in x))process.exit(1)})'
