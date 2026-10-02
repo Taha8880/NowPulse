@@ -1,20 +1,4 @@
 import {readFileSync} from "node:fs";
-const w=readFileSync("src/worker.js","utf8");
-const c=readFileSync("wrangler.jsonc","utf8");
-const checks=[
- ["version",w.includes('const VERSION="9.0.0"')],
- ["health",w.includes('service:"NowPulse"')],
- ["news api",w.includes('p==="/api/news"')],
- ["markets api",w.includes('p==="/api/markets"')],
- ["weather api",w.includes('p==="/api/weather"')],
- ["search",w.includes('p==="/search"')],
- ["article route",w.includes('p.startsWith("/article/")')],
- ["category route",w.includes('p.startsWith("/category/")')],
- ["ads",w.includes("google.com, pub-1235197294708204")],
- ["kv",c.includes("184c64ea1ed443e1bac081453cd599bf")],
- ["version var",c.includes("NOWPULSE_VERSION")],
- ["footer",w.includes("Created by Taha")]
-];
-const bad=checks.filter(x=>!x[1]).map(x=>x[0]);
-if(bad.length)throw Error("Contract failures: "+bad.join(", "));
-console.log("NowPulse v9 contract passed",checks.length);
+const w=readFileSync("src/worker.js","utf8"),c=readFileSync("wrangler.jsonc","utf8");
+const checks=[["version",w.includes('const VERSION="1.0.0"')],["health",w.includes('p==="/health"')],["news",w.includes('p==="/api/news"')],["markets",w.includes('p==="/api/markets"')],["weather",w.includes('p==="/api/weather"')],["search",w.includes('p==="/search"')],["article",w.includes('p.startsWith("/article/")')],["category",w.includes('p.startsWith("/category/")')],["ads",w.includes("pub-1235197294708204")],["footer",w.includes("Created by Taha")],["sitemap",w.includes('p==="/sitemap.xml"')],["config",c.includes('"main":"src/worker.js"')]];
+const bad=checks.filter(x=>!x[1]).map(x=>x[0]);if(bad.length)throw Error("Contract failures: "+bad.join(", "));console.log("NowPulse clean rebuild contract passed",checks.length);
