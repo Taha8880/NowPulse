@@ -51,7 +51,7 @@ async function generate(env,diag,mode,current){
     :"Perform conservative production maintenance: improve only clear quality/reliability issues visible in the diagnostics. Do not redesign the site, remove routes, remove bilingual behavior, weaken SEO, or replace working APIs without a concrete reason.";
   const rules="You are the senior production engineer for NowPulse. "+mission+" Return ONLY the complete src/worker.js JavaScript source, no Markdown. Keep Cloudflare Workers compatibility and the NowPulseGuardian Durable Object export. Arabic is primary RTL and English must remain complete LTR. Preserve all routes: /health /api/news /api/markets /api/weather /api/image /search /article/* /category/* /robots.txt /sitemap.xml /rss.xml /ads.txt and homepage. Never expose raw RSS HTML/entities or Google News wrapper pages. Article pages must show clean title/source/date/summary/relevant image and an original-source link, not republish full third-party articles. Prefer Egypt and Arab coverage, then world. Use real source images or relevant Wikimedia Commons fallback, never logos. Keep responsive professional formatting, dark/light mode, animated background, page transitions, search, ads, SEO, and footer 'NowPulse · Created by Taha'. Do not add npm dependencies.";
   const prompt=rules+"\nDiagnostics:\n"+JSON.stringify(diag)+"\nCurrent source:\n"+current;
-  let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Production Cloudflare Workers repair and maintenance agent."},{role:"user",content:prompt}],max_completion_tokens:30000,temperature:0.05,reasoning_effort:"high"})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
+  let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Production Cloudflare Workers repair and maintenance agent."},{role:"user",content:prompt}],max_completion_tokens:30000,temperature:0.05,reasoning_effort:"high"},{gateway:{id:env.NOWPULSE_AI_GATEWAY_ID||"default",skipCache:true,collectLog:true,metadata:{service:"nowpulse-ai-manager",mode}}})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
   const next=codeOnly(aiText(ai));if(!validSource(next))return{ok:false,reason:"AI returned invalid source",length:next.length};
   return{ok:true,next};
 }
@@ -80,7 +80,7 @@ async function run(env,force=false){
 export default{
   async fetch(req,env){
     const u=new URL(req.url);
-    if(u.pathname==="/health")return Response.json({ok:true,service:"nowpulse-ai-manager",model:env.NOWPULSE_AI_MODEL||MODEL,maintenance:env.NOWPULSE_AI_MAINTENANCE||"enabled"});
+    if(u.pathname==="/health")return Response.json({ok:true,service:"nowpulse-ai-manager",model:env.NOWPULSE_AI_MODEL||MODEL,gateway:env.NOWPULSE_AI_GATEWAY_ID||"default",maintenance:env.NOWPULSE_AI_MAINTENANCE||"enabled"});
     if(u.pathname==="/run")return Response.json(await run(env,true));
     if(u.pathname==="/diagnose")return Response.json(await diagnose());
     return new Response("NowPulse AI Manager",{status:404});
