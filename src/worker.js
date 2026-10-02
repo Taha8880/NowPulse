@@ -113,19 +113,17 @@ async function news(lang){
   return out;
 }
 async function markets(){
-  const d={fx:{},gold:{},updated:new Date().toISOString(),source:"Live market APIs"};
-  const pairs=[["USD","usd"],["EUR","eur"],["GBP","gbp"],["SAR","sar"],["AED","aed"]];
-  await Promise.all(pairs.map(async([base,key])=>{
-    try{
-      const x=await getJson("https://api.frankfurter.dev/v2/rate/"+base+"/EGP"),r=Number(x?.rate);
-      if(r>0)d.fx[key]={mid:r,buy:r*1.0025,sell:r*0.9975};
-    }catch{
-      try{
-        const x=await getJson("https://open.er-api.com/v6/latest/"+base),r=Number(x?.rates?.EGP);
-        if(r>0)d.fx[key]={mid:r,buy:r*1.0025,sell:r*0.9975};
-      }catch{}
+  const d={fx:{},gold:{},updated:new Date().toISOString(),source:"Frankfurter + XAU"};
+  try{
+    const rows=await getJson("https://api.frankfurter.dev/v2/rates?base=EGP&quotes=USD,EUR,GBP,SAR,AED");
+    for(const row of Array.isArray(rows)?rows:[]){
+      const key=String(row?.quote||"").toLowerCase(),r=Number(row?.rate);
+      if(key&&r>0){
+        const mid=1/r;
+        d.fx[key]={mid,buy:mid*1.0025,sell:mid*0.9975};
+      }
     }
-  }));
+  }catch{}
   let oz=null;
   try{oz=Number((await getJson("https://api.frankfurter.dev/v2/rate/xau/usd"))?.rate)}catch{}
   if(!(oz>0)){
@@ -133,12 +131,11 @@ async function markets(){
   }
   const usd=d.fx.usd?.mid;
   if(oz>0&&usd>0){
-    const world=oz,egpOz=oz*usd,g24=egpOz/31.1034768;
-    const gold={};
+    const egpOz=oz*usd,g24=egpOz/31.1034768,gold={};
     [["24K",g24],["21K",g24*21/24],["18K",g24*18/24],["Coin",g24*21/24*8],["Ounce",egpOz]].forEach(([name,v])=>{
-      gold[name]={buy:v*1.008,sell:v*0.995};
+      gold[name]={mid:v,buy:v*1.008,sell:v*0.995};
     });
-    gold.World={buy:world*1.002,sell:world*0.998,currency:"USD"};
+    gold.World={mid:oz,buy:oz*1.002,sell:oz*0.998,currency:"USD"};
     d.gold=gold;
   }
   return d;
