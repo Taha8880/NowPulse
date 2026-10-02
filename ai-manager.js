@@ -3,17 +3,87 @@ const REPO="Taha8880/NowPulse";
 const BRANCH="main";
 const FILE="src/worker.js";
 const MODEL="openai/gpt-6-sol";
-async function req(url,init={}){const r=await fetch(url,{...init,headers:{"accept":"application/json",...(init.headers||{})}});const t=await r.text();let d={};try{d=JSON.parse(t)}catch{}return{ok:r.ok,status:r.status,data:d,text:t}}
-async function site(url){try{const r=await fetch(url,{redirect:"follow",headers:{"user-agent":"NowPulse-AI-Manager/1.0"}});return{ok:r.ok,status:r.status,text:(await r.text()).slice(0,5000)}}catch(e){return{ok:false,status:0,text:String(e)}}}
+const CATS=["latest","egypt","arab","world","politics","sports","economy","tech","arts","health","travel","trends"];
+
+async function req(url,init={}){const r=await fetch(url,{...init,headers:{"accept":"application/json",...(init.headers||{})}});const t=await r.text();let data={};try{data=JSON.parse(t)}catch{}return{ok:r.ok,status:r.status,data,text:t}}
+async function site(path){try{const r=await fetch(SITE+path,{redirect:"follow",headers:{"user-agent":"NowPulse-AI-Manager/2.0","accept":"text/html,application/json,*/*"}});return{ok:r.ok,status:r.status,text:(await r.text()).slice(0,12000)}}catch(e){return{ok:false,status:0,text:String(e)}}}
 function b64(s){const a=new TextEncoder().encode(s);let x="";for(let i=0;i<a.length;i+=32768)x+=String.fromCharCode(...a.slice(i,i+32768));return btoa(x)}
-function aiText(x){if(typeof x==="string")return x;if(x&&x.choices&&x.choices[0]&&x.choices[0].message)return x.choices[0].message.content||"";if(x&&x.output_text)return x.output_text;if(x&&x.response)return x.response;if(x&&Array.isArray(x.output)){let s="";for(const o of x.output||[])for(const c of o.content||[])if(c&&c.text)s+=c.text;return s}return""}
-function codeOnly(s){let x=String(s||"").trim();const m=x.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);if(m)x=m[1].trim();return x}
-async function diagnose(){const d={time:new Date().toISOString(),checks:{},broken:[]};d.checks.health=await site(SITE+"/health");d.checks.markets=await site(SITE+"/api/markets");d.checks.news=await site(SITE+"/api/news?lang=ar");d.checks.search=await site(SITE+"/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar");const cats=["latest","egypt","arab","world","politics","sports","economy","tech","arts","health","travel","trends"];d.checks.categories={};for(const c of cats)d.checks.categories[c]=await site(SITE+"/category/"+c+"?lang=ar");let n={};try{n=JSON.parse(d.checks.news.text||"{}")}catch{}let m={};try{m=JSON.parse(d.checks.markets.text||"{}")}catch{}let id=n.latest&&n.latest[0]&&n.latest[0].id;if(id)d.checks.article=await site(SITE+"/article/"+encodeURIComponent(id)+"?lang=ar");else d.checks.article={ok:false,status:0,text:"no article id"};if(!d.checks.health.ok||!d.checks.health.text.includes('"ok":true'))d.broken.push("health");if(!d.checks.news.ok||!Array.isArray(n.latest)||n.latest.length<5)d.broken.push("news");for(const k of ["usdEgp","eurEgp","gbpEgp","gold24","gold21","gold18"])if(!(Number(m[k])>0))d.broken.push("market:"+k);if(!d.checks.search.ok||!/(نتائج البحث|Search results)/.test(d.checks.search.text||""))d.broken.push("search");for(const c of cats)if(!d.checks.categories[c].ok||!/<html/i.test(d.checks.categories[c].text||""))d.broken.push("category:"+c);if(!d.checks.article.ok||!/<h1>/i.test(d.checks.article.text||""))d.broken.push("article");return d}
-async function run(env){if(!env.NOWPULSE_GITHUB_TOKEN)return{ok:false,reason:"NOWPULSE_GITHUB_TOKEN missing"};const diag=await diagnose();if(!diag.broken.length)return{ok:true,action:"healthy"};if(env.NOWPULSE_KV&&await env.NOWPULSE_KV.get("repair-lock"))return{ok:false,action:"cooldown",broken:diag.broken};const g=await req("https://api.github.com/repos/"+REPO+"/contents/"+FILE+"?ref="+BRANCH,{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager"}});if(!g.ok)return{ok:false,reason:"GitHub read failed",status:g.status};const current=atob(String(g.data.content||"").replace(/\n/g,""));
-const rules="You are the production repair engineer for NowPulse. Repair ONLY src/worker.js. Return ONLY complete JavaScript source, no Markdown. Preserve Cloudflare Worker compatibility and the existing Durable Object export. Requirements: all category/search/article routes must be styled HTML; Arabic must be clean RTL UTF-8; never expose raw RSS HTML/entities; never show Google News wrapper as article content; article pages show title/source/date/relevant image/clean summary/original-source link and do not republish full third-party articles; images use source image or relevant Wikimedia Commons fallback, never logos; Egypt and Arab news first; markets USD/EGP EUR/EGP GBP/EGP and gold 24K/21K/18K numeric when upstream available; keep /health /api/news /api/markets /api/weather /search /article/* /category/* robots sitemap ads; keep footer NowPulse · Created by Taha; no npm packages.";
-const prompt=rules+"\nObserved failing checks: "+JSON.stringify(diag.broken)+"\nDiagnostics: "+JSON.stringify(diag)+"\nCurrent source:\n"+current;
-let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Senior Cloudflare Workers coding agent. Produce production-ready JavaScript only."},{role:"user",content:prompt}],max_completion_tokens:22000,temperature:0.1,reasoning_effort:"high"})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e),broken:diag.broken}}
-const next=codeOnly(aiText(ai));if(next.length<5000||!next.includes("export default")||!next.includes("NowPulse"))return{ok:false,reason:"AI returned invalid source",broken:diag.broken};
-const put=await req("https://api.github.com/repos/"+REPO+"/contents/"+FILE,{method:"PUT",headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"content-type":"application/json","x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager"},body:JSON.stringify({message:"AI repair: fix NowPulse production checks",content:b64(next),sha:g.data.sha,branch:BRANCH})});
-if(!put.ok)return{ok:false,reason:"GitHub write failed",status:put.status,detail:put.text,broken:diag.broken};if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});return{ok:true,action:"repaired",commit:put.data.commit&&put.data.commit.sha,broken:diag.broken}}
-export default{async fetch(req,env){const u=new URL(req.url);if(u.pathname==="/health")return Response.json({ok:true,service:"nowpulse-ai-manager",model:env.NOWPULSE_AI_MODEL||MODEL});if(u.pathname==="/run")return Response.json(await run(env));return new Response("NowPulse AI Manager",{status:404})},async scheduled(c,env,ctx){ctx.waitUntil(run(env).then(x=>console.log(JSON.stringify(x))).catch(e=>console.error(e)))}};
+function aiText(x){if(typeof x==="string")return x;if(x?.choices?.[0]?.message)return x.choices[0].message.content||"";if(x?.output_text)return x.output_text;if(x?.response)return x.response;if(Array.isArray(x?.output)){let s="";for(const o of x.output)for(const c of o.content||[])if(c?.text)s+=c.text;return s}return""}
+function codeOnly(s){let x=String(s||"").trim();const m=x.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);return m?m[1].trim():x}
+function validSource(s){
+  const x=String(s||"");
+  if(x.length<12000||x.length>180000)return false;
+  if(!x.includes("export default")||!x.includes("NowPulse")||!x.includes("async function news")||!x.includes("function shell")||!x.includes("/api/markets"))return false;
+  const opens=(x.match(/[{}]/g)||[]).reduce((n,c)=>n+(c==="{"?1:-1),0);
+  return opens===0;
+}
+async function diagnose(){
+  const d={time:new Date().toISOString(),broken:[],quality:{}};
+  d.health=await site("/health"); d.markets=await site("/api/markets"); d.news=await site("/api/news?lang=ar");
+  d.search=await site("/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar");
+  d.home=await site("/?lang=ar");
+  d.categories={};
+  for(const c of CATS)d.categories[c]=await site("/category/"+c+"?lang=ar");
+  let n={},m={};try{n=JSON.parse(d.news.text||"{}")}catch{}try{m=JSON.parse(d.markets.text||"{}")}catch{}
+  const id=n.latest?.[0]?.id;
+  d.article=id?await site("/article/"+encodeURIComponent(id)+"?lang=ar"):{ok:false,text:"no article"};
+  if(!d.health.ok||!/"ok":true/.test(d.health.text))d.broken.push("health");
+  if(!d.news.ok||!Array.isArray(n.latest)||n.latest.length<5)d.broken.push("news");
+  for(const k of ["usdEgp","eurEgp","gbpEgp","gold24","gold21","gold18"])if(!(Number(m[k])>0))d.broken.push("market:"+k);
+  if(!d.search.ok||!d.search.text.includes("نتائج البحث"))d.broken.push("search");
+  for(const c of CATS)if(!d.categories[c].ok||!/<html/i.test(d.categories[c].text))d.broken.push("category:"+c);
+  if(!d.article.ok||!/<h1>/i.test(d.article.text)||/Google News/i.test(d.article.text))d.broken.push("article");
+  const raw=JSON.stringify(n);
+  if(/<a\b|&lt;\s*a|news\.google\.com\/rss/i.test(raw))d.broken.push("raw-rss");
+  if(d.search.text.includes("news.google.com")||/&lt;/.test(d.search.text))d.broken.push("search-rss");
+  if(d.home.text.includes("لا توجد صورة من المصدر")||d.home.text.includes("No source image"))d.broken.push("image-ui");
+  d.quality.newsWithImages=(n.latest||[]).filter(x=>x.image).length;
+  d.quality.newsTotal=(n.latest||[]).length;
+  d.quality.rawRss=/<a\b|&lt;\s*a|news\.google\.com\/rss/i.test(raw);
+  return d;
+}
+async function githubFile(env){
+  return req("https://api.github.com/repos/"+REPO+"/contents/"+FILE+"?ref="+BRANCH,{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.0"}});
+}
+async function generate(env,diag,mode,current){
+  const mission=mode==="repair"
+    ?"Fix every failing production check while preserving existing working behavior."
+    :"Perform conservative production maintenance: improve only clear quality/reliability issues visible in the diagnostics. Do not redesign the site, remove routes, remove bilingual behavior, weaken SEO, or replace working APIs without a concrete reason.";
+  const rules="You are the senior production engineer for NowPulse. "+mission+" Return ONLY the complete src/worker.js JavaScript source, no Markdown. Keep Cloudflare Workers compatibility and the NowPulseGuardian Durable Object export. Arabic is primary RTL and English must remain complete LTR. Preserve all routes: /health /api/news /api/markets /api/weather /api/image /search /article/* /category/* /robots.txt /sitemap.xml /rss.xml /ads.txt and homepage. Never expose raw RSS HTML/entities or Google News wrapper pages. Article pages must show clean title/source/date/summary/relevant image and an original-source link, not republish full third-party articles. Prefer Egypt and Arab coverage, then world. Use real source images or relevant Wikimedia Commons fallback, never logos. Keep responsive professional formatting, dark/light mode, animated background, page transitions, search, ads, SEO, and footer 'NowPulse · Created by Taha'. Do not add npm dependencies.";
+  const prompt=rules+"\nDiagnostics:\n"+JSON.stringify(diag)+"\nCurrent source:\n"+current;
+  let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Production Cloudflare Workers repair and maintenance agent."},{role:"user",content:prompt}],max_completion_tokens:30000,temperature:0.05,reasoning_effort:"high"})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
+  const next=codeOnly(aiText(ai));if(!validSource(next))return{ok:false,reason:"AI returned invalid source",length:next.length};
+  return{ok:true,next};
+}
+async function commit(env,next,message,sha){
+  return req("https://api.github.com/repos/"+REPO+"/contents/"+FILE,{method:"PUT",headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"content-type":"application/json","x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.0"},body:JSON.stringify({message,content:b64(next),sha,branch:BRANCH})});
+}
+async function run(env,force=false){
+  if(!env.NOWPULSE_GITHUB_TOKEN)return{ok:false,reason:"NOWPULSE_GITHUB_TOKEN missing"};
+  const diag=await diagnose();
+  const repairNeeded=diag.broken.length>0;
+  const maintenanceEnabled=env.NOWPULSE_AI_MAINTENANCE!=="disabled";
+  let maintenanceDue=false;
+  if(maintenanceEnabled&&env.NOWPULSE_KV){const last=await env.NOWPULSE_KV.get("last-maintenance");maintenanceDue=!last||(Date.now()-Date.parse(last)>21600000)}
+  if(!force&&!repairNeeded&&!maintenanceDue)return{ok:true,action:"healthy",quality:diag.quality};
+  if(env.NOWPULSE_KV){const lock=await env.NOWPULSE_KV.get("repair-lock");if(lock&&!force)return{ok:true,action:"cooldown",broken:diag.broken}}
+  const g=await githubFile(env);if(!g.ok)return{ok:false,reason:"GitHub read failed",status:g.status,detail:g.text};
+  const current=atob(String(g.data.content||"").replace(/\n/g,""));
+  const generated=await generate(env,diag,repairNeeded?"repair":"maintenance",current);if(!generated.ok)return{...generated,broken:diag.broken};
+  if(generated.next===current)return{ok:true,action:"no-change",broken:diag.broken};
+  const message=repairNeeded?"AI repair: fix NowPulse production quality checks":"AI maintenance: conservative NowPulse quality improvement";
+  const put=await commit(env,generated.next,message,g.data.sha);
+  if(!put.ok)return{ok:false,reason:"GitHub write failed",status:put.status,detail:put.text,broken:diag.broken};
+  if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});if(!repairNeeded)await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
+  return{ok:true,action:repairNeeded?"repaired":"maintained",commit:put.data.commit?.sha,broken:diag.broken,quality:diag.quality};
+}
+export default{
+  async fetch(req,env){
+    const u=new URL(req.url);
+    if(u.pathname==="/health")return Response.json({ok:true,service:"nowpulse-ai-manager",model:env.NOWPULSE_AI_MODEL||MODEL,maintenance:env.NOWPULSE_AI_MAINTENANCE||"enabled"});
+    if(u.pathname==="/run")return Response.json(await run(env,true));
+    if(u.pathname==="/diagnose")return Response.json(await diagnose());
+    return new Response("NowPulse AI Manager",{status:404});
+  },
+  async scheduled(c,env,ctx){ctx.waitUntil(run(env).then(x=>console.log(JSON.stringify(x))).catch(e=>console.error(e)))}
+};
