@@ -1,4 +1,4 @@
-const VERSION="1.5.0";
+const VERSION="1.6.0";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const ADSENSE="ca-pub-1235197294708204";
 export class NowPulseGuardian{constructor(state,env){this.state=state;this.env=env}async fetch(){return new Response(JSON.stringify({ok:true,service:"NowPulseGuardian",version:VERSION}),{headers:{"content-type":"application/json;charset=UTF-8"}})}}
@@ -18,22 +18,39 @@ function tag(x,n){const m=String(x).match(new RegExp("<"+n+"(?:\\s[^>]*)?>([\\s\
 function attr(x,n,a){const m=String(x).match(new RegExp("<"+n+"\\b[^>]*\\b"+a+"=[\"']([^\"']+)[\"'][^>]*>","i"));return m?m[1]:""}
 function enc(s){const b=new TextEncoder().encode(String(s));let z="";for(const x of b)z+=String.fromCharCode(x);return btoa(z).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
 function dec(s){try{const x=String(s).replace(/-/g,"+").replace(/_/g,"/"),b=atob(x+"=".repeat((4-x.length%4)%4));return new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0)))}catch{return""}}
+function storyFromId(id){
+  const raw=dec(decodeURIComponent(id||""));
+  if(!raw)return null;
+  try{const o=JSON.parse(raw);if(o&&typeof o==="object"&&o.link)return o}catch{}
+  return {link:raw};
+}
+function storyId(x){return x?.id||enc(JSON.stringify({title:x?.title||"",description:x?.description||"",date:x?.date||"",link:x?.link||"",source:x?.source||"",image:x?.image||""}))}
 function image(block){const a=[attr(block,"media:content","url"),attr(block,"media:thumbnail","url"),attr(block,"enclosure","url")],d=tag(block,"description"),m=d.match(/<img[^>]+src=["']([^"']+)["']/i);if(m)a.push(m[1]);for(const x of a){const u=url(String(x||"").replace(/^\/\//,"https://"));if(u&&!/favicon|logo|avatar|icon|sprite|placeholder/i.test(u))return u}return""}
 function rss(xml,source){
   const bs=String(xml).match(/<item\b[\s\S]*?<\/item>/gi)||[];
-  return bs.map(b=>{const link=url(tag(b,"link")||attr(b,"link","href")),title=strip(tag(b,"title")),d1=strip(tag(b,"description")),d2=strip(tag(b,"content:encoded")),description=strip([d1,d2].filter(Boolean).join(" ")),rd=tag(b,"pubDate")||tag(b,"published")||tag(b,"updated");let date="";if(rd){const d=new Date(rd);if(!Number.isNaN(d.getTime()))date=d.toISOString()}return link&&title?{id:enc(link),title,description,date,link,source:clean(tag(b,"source")||source),image:image(b)}:null}).filter(Boolean);
+  return bs.map(b=>{const link=url(tag(b,"link")||attr(b,"link","href")),title=strip(tag(b,"title")),d1=strip(tag(b,"description")),d2=strip(tag(b,"content:encoded")),description=strip([d1,d2].filter(Boolean).join(" ")),rd=tag(b,"pubDate")||tag(b,"published")||tag(b,"updated");let date="";if(rd){const d=new Date(rd);if(!Number.isNaN(d.getTime()))date=d.toISOString()}return link&&title?(()=>{const item={title,description,date,link,source:clean(tag(b,"source")||source),image:image(b)};return{id:enc(JSON.stringify(item)),...item}})():null}).filter(Boolean);
 }
 function uniq(a){const s=new Set();return a.filter(x=>{const k=(x.link||x.title).toLowerCase();if(s.has(k))return false;s.add(k);return true})}
 async function searchFeed(q,lang){try{return rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q+" when:1d")+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{return[]}}
 async function commons(q){
   try{
-    const d=await getJson("https://commons.wikimedia.org/w/rest.php/v1/search/page?q="+encodeURIComponent(clean(q))+"&limit=6");
+    const d=await getJson("https://commons.wikimedia.org/w/rest.php/v1/search/page?q="+encodeURIComponent(clean(q))+"&limit=8");
     for(const p of d.pages||[]){
       const u=url(p?.thumbnail?.url||p?.original?.url);
       if(u&&!/logo|icon|flag|sprite|placeholder/i.test(u))return u;
     }
   }catch{}
   return "";
+}
+async function imageResponse(q){
+  const u=await commons(q);
+  if(!u)return new Response("",{status:404,headers:{"cache-control":"public,max-age=300"}});
+  try{
+    const r=await fetch(u,{headers:{"user-agent":"NowPulse Image Proxy/1.0","accept":"image/avif,image/webp,image/jpeg,image/png,*/*"}});
+    if(!r.ok)throw Error("image "+r.status);
+    const h=new Headers(r.headers);h.set("cache-control","public,max-age=21600,stale-while-revalidate=86400");h.set("x-content-type-options","nosniff");
+    return new Response(r.body,{status:200,headers:h});
+  }catch{return new Response("",{status:502,headers:{"cache-control":"public,max-age=300"}})}
 }
 async function resolveSource(target){let current=url(target);if(!current)return "";for(let i=0;i<4;i++){try{const r=await fetch(current,{redirect:"manual",headers:{"user-agent":"NowPulse/1.1","accept":"text/html,application/xhtml+xml,*/*"}});if(r.status>=300&&r.status<400){const loc=r.headers.get("location");if(!loc)return current;current=new URL(loc,current).toString();continue}return r.url||current}catch{return current}}return current}
 async function articleMeta(target){const final=await resolveSource(target);if(!final||/news\.google\.com/i.test(final))return{url:target};try{const html=await getText(final),title=(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||"",desc=(html.match(/<meta[^>]+(?:name|property)=[\"'](?:description|og:description|twitter:description)[\"'][^>]+content=[\"']([^\"']*)/i)||[])[1]||"",og=(html.match(/<meta[^>]+(?:property|name)=[\"'](?:og:image|twitter:image)[\"'][^>]+content=[\"']([^\"']*)/i)||[])[1]||"",canonical=(html.match(/<link[^>]+rel=[\"']canonical[\"'][^>]+href=[\"']([^\"']*)/i)||[])[1]||"";return{url:url(canonical)||final,title:strip(title),description:strip(desc),image:url(og)||""}}catch{return{url:final}}}
@@ -148,7 +165,10 @@ function nav(l,a){return Object.entries(CATS).map(([k,v])=>"<a class='"+(a===k?"
 function ad(){return"<div class='ad'><ins class='adsbygoogle' style='display:block' data-ad-client='"+ADSENSE+"' data-ad-format='auto' data-full-width-responsive='true'></ins><script>(adsbygoogle=window.adsbygoogle||[]).push({});</script></div>"}
 function shell(l,title,active,body,desc){
  const ar=l==="ar",other=ar?"en":"ar",themeClass=active||"latest",d=desc||"NowPulse: "+(ar?"أخبار ومعلومات من مصادر وروابط أصلية.":"News and information with original source links.");
- return "<!doctype html><html lang='"+l+"' dir='"+(ar?"rtl":"ltr")+"'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name='description' content='"+esc(d)+"'><meta name='robots' content='index,follow,max-image-preview:large'><link rel='canonical' href='"+SITE+"'><link rel='alternate' hreflang='ar' href='"+SITE+"/?lang=ar'><link rel='alternate' hreflang='en' href='"+SITE+"/?lang=en'><meta property='og:title' content='"+esc(title)+" | NowPulse'><meta property='og:description' content='"+esc(d)+"'><meta property='og:type' content='website'><title>"+esc(title)+" | NowPulse</title><style>"+CSS+"</style><script async src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client="+ADSENSE+"' crossorigin='anonymous'></script></head><body class='theme-"+themeClass+"' dir='"+(ar?"rtl":"ltr")+"'><header><div class='c head'><a class='logo' href='/?lang="+l+"'>NowPulse<small>نبض الآن · News & Information</small></a><div class='actions'><form class='searchbox' action='/search' method='get'><input name='q' required placeholder='"+(ar?"ابحث عن خبر أو موضوع":"Search news or topic")+"' aria-label='"+(ar?"بحث":"Search")+"'><input type='hidden' name='lang' value='"+l+"'><button class='btn'>"+(ar?"بحث":"Search")+"</button></form><button id='theme' class='btn iconbtn' type='button' title='"+(ar?"الوضع الليلي":"Dark mode")+"' aria-label='"+(ar?"الوضع الليلي":"Dark mode")+"'>◐</button><a id='langToggle' class='btn lang' href='/?lang="+other+"'>"+(ar?"EN":"عربي")+"</a></div></div><nav class='c nav'>"+nav(l,active)+"</nav></header><main class='c page-enter'>"+body+"</main><footer><div class='c'>NowPulse · Created by Taha</div></footer><script>(function(){const k='nowpulse-theme',b=document.body,h=document.documentElement;const saved=localStorage.getItem(k);if(saved)h.dataset.theme=saved;const lt=document.getElementById('langToggle');if(lt){const u=new URL(location.href);u.searchParams.set('lang','"+other+"');lt.href=u.pathname+'?'+u.searchParams.toString()}document.getElementById('theme')?.addEventListener('click',()=>{const n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem(k,n)});document.querySelectorAll('a[href]').forEach(a=>a.addEventListener('click',e=>{if(a.origin===location.origin&&!a.target&&a.pathname!==location.pathname){document.body.classList.add('page-leave')}}))})();</script></body></html>"
+ const pagePath=active&&active!=="latest"?"/category/"+active:"/";
+ const pageUrl=SITE+pagePath+"?lang="+l;
+ const security={"cache-control":"no-store, no-cache, must-revalidate, max-age=0","x-content-type-options":"nosniff","x-frame-options":"DENY","referrer-policy":"strict-origin-when-cross-origin","permissions-policy":"camera=(),microphone=(),geolocation=(),payment=()","strict-transport-security":"max-age=31536000; includeSubDomains"};
+ return new Response("<!doctype html><html lang='"+l+"' dir='"+(ar?"rtl":"ltr")+"'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name='description' content='"+esc(d)+"'><meta name='robots' content='index,follow,max-image-preview:large'><link rel='canonical' href='"+pageUrl+"'><link rel='alternate' hreflang='ar' href='"+SITE+"/?lang=ar'><link rel='alternate' hreflang='en' href='"+SITE+"/?lang=en'><meta property='og:title' content='"+esc(title)+" | NowPulse'><meta property='og:description' content='"+esc(d)+"'><meta property='og:type' content='website'><meta property='og:site_name' content='NowPulse'><meta name='theme-color' content='#0b1220'><title>"+esc(title)+" | NowPulse</title><style>"+CSS+"</style><script async src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client="+ADSENSE+"' crossorigin='anonymous'></script></head><body class='theme-"+themeClass+"' dir='"+(ar?"rtl":"ltr")+"'><header><div class='c head'><a class='logo' href='/?lang="+l+"'>NowPulse<small>نبض الآن · News & Information</small></a><div class='actions'><form class='searchbox' action='/search' method='get'><input name='q' required placeholder='"+(ar?"ابحث عن خبر أو موضوع":"Search news or topic")+"' aria-label='"+(ar?"بحث":"Search")+"'><input type='hidden' name='lang' value='"+l+"'><button class='btn'>"+(ar?"بحث":"Search")+"</button></form><button id='theme' class='btn iconbtn' type='button' title='"+(ar?"الوضع الليلي":"Dark mode")+"' aria-label='"+(ar?"الوضع الليلي":"Dark mode")+"'>◐</button><a id='langToggle' class='btn lang' href='/?lang="+other+"'>"+(ar?"EN":"عربي")+"</a></div></div><nav class='c nav'>"+nav(l,active)+"</nav></header><main class='c page-enter'>"+body+"</main><footer><div class='c'>NowPulse · Created by Taha</div></footer><script>(function(){const k='nowpulse-theme',b=document.body,h=document.documentElement;const saved=localStorage.getItem(k);if(saved)h.dataset.theme=saved;const lt=document.getElementById('langToggle');if(lt){const u=new URL(location.href);u.searchParams.set('lang','"+other+"');lt.href=u.pathname+'?'+u.searchParams.toString()}document.getElementById('theme')?.addEventListener('click',()=>{const n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem(k,n)});document.querySelectorAll('a[href]').forEach(a=>a.addEventListener('click',e=>{if(a.origin===location.origin&&!a.target&&a.pathname!==location.pathname){document.body.classList.add('page-leave')}}))})();</script></body></html>",{headers:{"content-type":"text/html;charset=UTF-8",...security}})
 }
 function card(x,l){const h="/article/"+encodeURIComponent(x.id)+"?lang="+l,img=x.image?"<img src='"+esc(x.image)+"' alt='"+esc(x.title)+"' loading='lazy' referrerpolicy='no-referrer'>":"<img src='/api/image?q="+encodeURIComponent(x.title)+"' alt='"+esc(x.title)+"' loading='lazy' referrerpolicy='no-referrer'>";return"<article class='card'><a href='"+h+"'><div class='thumb'>"+img+"</div><div class='body'><div class='meta'>"+esc(x.source||"Source")+(x.date?" · "+esc(dt(x.date,l)):"")+"</div><h3>"+esc(x.title)+"</h3>"+(x.description?"<p class='desc'>"+esc(x.description)+"</p>":"")+"</div></a></article>"}
 function home(l){
@@ -157,7 +177,7 @@ function home(l){
   const body="<section class='hero'><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع تغطية متنوعة.":"Egypt and Arab news first, followed by global coverage across major topics.")+"</p><div class='quote' id='quote'>"+esc(QUOTES[quoteIndex])+"</div></section>"+ad()
   +"<section class='market-strip'><div class='market-strip-head'><h2>"+(ar?"الأسعار الآن":"Live prices")+"</h2><a href='/category/economy?lang="+l+"'>"+(ar?"كل الأسعار":"All prices")+"</a><small id='marketUpdated'>"+(ar?"تحديث...":"Updating...")+"</small></div><div id='marketRows' class='market-items'><div class='market-mini'>"+(ar?"جاري التحديث...":"Updating...")+"</div></div></section>"+"<div class='weather' id='weather'>"+(ar?"جاري تحديث الطقس...":"Updating weather...")+"</div><div id='feed'><div class='empty' style='margin-top:18px'>"+(ar?"جاري تحميل الأخبار...":"Loading news...")+"</div></div>"
   +"<script>(async()=>{const l="+JSON.stringify(l)+",ar=l==='ar',f=document.getElementById('feed'),q="+JSON.stringify(QUOTES)+",quote=document.getElementById('quote');"
-  +"function escH(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
+  +"function escH(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}function storyIdClient(x){const bytes=new TextEncoder().encode(JSON.stringify({title:x.title||'',description:x.description||'',date:x.date||'',link:x.link||'',source:x.source||'',image:x.image||''}));let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}"
   +"function price(v,cur){return Number(v)>0?Number(v).toLocaleString(ar?'ar-EG':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur:'—'}"
   +"function row(name,v,cur){if(!v||Number(v.mid||v.buy)<=0)return '';const p=Number(v.mid||((Number(v.buy)+Number(v.sell))/2));return '<div class=\'market-mini\'><b>'+escH(name)+'</b><strong>'+price(p,cur)+'</strong></div>'}"
   +"async function refreshMarkets(){try{const m=await fetch('/api/markets?ts='+Date.now(),{cache:'no-store'}).then(r=>r.json()),r=document.getElementById('marketRows');let h='';"
@@ -167,7 +187,7 @@ function home(l){
   +"r.innerHTML=h||'<div class=\'market-mini\'>'+(ar?'تعذر تحديث الأسعار مؤقتًا.':'Prices temporarily unavailable.')+'</div>';document.getElementById('marketUpdated').textContent=(ar?'آخر تحديث: ':'Updated: ')+new Date().toLocaleTimeString(ar?'ar-EG':'en-US');}catch{}}"
   +"async function refreshQuote(){if(quote)quote.textContent=q[Math.floor(Date.now()/30000)%q.length]||q[0]}"
   +"await refreshMarkets();refreshQuote();setInterval(refreshMarkets,900000);setInterval(refreshQuote,30000);"
-  +"try{const n=await fetch('/api/news?lang='+l+'&ts='+Date.now(),{cache:'no-store'}).then(r=>r.json());f.innerHTML='';const c="+JSON.stringify(CATS)+";for(const k of Object.keys(c)){const a=Array.isArray(n[k])?n[k].slice(0,6):[];if(!a.length)continue;const s=document.createElement('section');s.className='section';s.innerHTML=`<div class='section-head'><h2>${c[k][ar?0:1]}</h2><a href='/category/${k}?lang=${l}'>${ar?'عرض الكل':'View all'}</a></div><div class='grid'></div>`;const g=s.querySelector('.grid');a.forEach(x=>{const e=document.createElement('article');e.className='card';const href='/article/'+encodeURIComponent(x.id)+'?lang='+l;e.innerHTML=`<a href='${href}'><div class='thumb'>${x.image?`<img src='${escH(x.image)}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'>`:`<img src='/api/image?q=${encodeURIComponent(x.title)}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'>`}</div><div class='body'><div class='meta'>${escH(x.source||'NowPulse')}${x.date?' · '+escH(new Date(x.date).toLocaleString(ar?'ar-EG':'en-US')):''}</div><h3>${escH(x.title)}</h3><p class='desc'>${escH(x.description||'')}</p></div></a>`;g.appendChild(e)});f.appendChild(s)}}catch{f.innerHTML='<div class=empty>'+(ar?'تعذر تحميل الأخبار مؤقتًا.':'News is temporarily unavailable.')+'</div>'}})();</script>";
+  +"try{const n=await fetch('/api/news?lang='+l+'&ts='+Date.now(),{cache:'no-store'}).then(r=>r.json());f.innerHTML='';const c="+JSON.stringify(CATS)+";for(const k of Object.keys(c)){const a=Array.isArray(n[k])?n[k].slice(0,6):[];if(!a.length)continue;const s=document.createElement('section');s.className='section';s.innerHTML=`<div class='section-head'><h2>${c[k][ar?0:1]}</h2><a href='/category/${k}?lang=${l}'>${ar?'عرض الكل':'View all'}</a></div><div class='grid'></div>`;const g=s.querySelector('.grid');a.forEach(x=>{const e=document.createElement('article');e.className='card';const href='/article/'+encodeURIComponent(storyId(x))+'?lang='+l;e.innerHTML=`<a href='${href}'><div class='thumb'>${x.image?`<img src='${escH(x.image)}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'>`:`<img src='/api/image?q=${encodeURIComponent(x.title)}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'>`}</div><div class='body'><div class='meta'>${escH(x.source||'NowPulse')}${x.date?' · '+escH(new Date(x.date).toLocaleString(ar?'ar-EG':'en-US')):''}</div><h3>${escH(x.title)}</h3><p class='desc'>${escH(x.description||'')}</p></div></a>`;g.appendChild(e)});f.appendChild(s)}}catch{f.innerHTML='<div class=empty>'+(ar?'تعذر تحميل الأخبار مؤقتًا.':'News is temporarily unavailable.')+'</div>'}})();</script>";
   return shell(l,ar?"NowPulse":"NowPulse","latest",body,ar?"أخبار مصر والعالم العربي مع معلومات اقتصادية مختصرة.":"Egypt and Arab news with a compact market snapshot.");
 }
 async function category(l,k){
@@ -179,53 +199,23 @@ async function category(l,k){
   return shell(l,title,k,"<section class='hero'><h1>"+esc(title)+"</h1><p>"+(l==="ar"?"أحدث النتائج المتاحة من مصادر الأخبار.":"Latest available results from news sources.")+"</p></section>"+ad()+content);
 }
 async function article(l,id){
-  const target=dec(decodeURIComponent(id));
-  if(!target){
-    return shell(l,l==="ar"?"الخبر غير متاح":"Story unavailable","",
-      "<div class='empty' style='margin-top:30px'>"+(l==="ar"?"الخبر غير متاح حاليًا.":"This story is not available right now.")+"</div>");
-  }
-  const meta=await articleMeta(target);
-  let x={
-    id,
-    link:target,
-    title:meta.title&&meta.title!=="Google News"?meta.title:"",
-    description:meta.description||"",
-    date:"",
-    source:"",
-    image:meta.image||""
-  };
-  if(!x.title)x.title=target;
-  if(!x.image)x.image="/api/image?q="+encodeURIComponent(x.title);
-  x.source=(()=>{try{const h=new URL(meta.url||target).hostname.replace(/^www\\./,"");return /(^|\\.)news\\.google\\.com$/i.test(h)?"News source":h}catch{return"Source"}})();
-
-  const title=strip(x.title)||"NowPulse";
-  const summary=strip(x.description);
-  const date=dt(x.date,l),source=strip(x.source)||"NowPulse";
-  const ar=l==="ar";
-  const sentences=summary
-    .replace(/\\s+/g," ")
-    .split(/(?<=[.!?؟])\\s+/)
-    .map(strip).filter(Boolean);
-  const intro=sentences.slice(0,2).join(" ");
-  const details=sentences.slice(2,6).join(" ");
-  const remaining=sentences.slice(6).join(" ");
-  const fallback=summary|| (ar?"لا تتوفر تفاصيل إضافية موثقة في المصدر المتاح حاليًا.":"No additional verified details are available from the source data currently accessible.");
-  const section=(heading,text)=>{
-    if(!text)return "";
-    return "<section class='article-section'><h2>"+esc(heading)+"</h2><p class='article-p'>"+esc(text)+"</p></section>";
-  };
-  const context=ar?"المصدر: "+source:"Source: "+source;
-  const body="<article class='article'>"
-    +"<div class='article-top'><span class='source'>"+esc(source)+"</span>"+(date?"<span class='date'>"+esc(date)+"</span>":"")+"</div>"
-    +"<h1>"+esc(title)+"</h1>"
-    +(x.image?"<figure class='article-media'><img src='"+esc(x.image)+"' alt='"+esc(title)+"' referrerpolicy='no-referrer'><figcaption>"+esc(title)+"</figcaption></figure>":"")
-    +"<div class='article-lead'>"+esc(intro||fallback)+"</div>"
-    +"<div class='article-content'>"
-    +section(ar?"ملخص الخبر":"News summary",fallback)
-    +section(ar?"التفاصيل المتاحة":"Available details",details)
-    +section(ar?"معلومات إضافية":"Additional information",remaining)
-    +"</div>"+ad()+"</article>";
-  return shell(l,title,"",body,summary||context);
+  const ar=l==="ar",story=storyFromId(id);
+  if(!story?.link)return shell(l,ar?"الخبر غير متاح":"Story unavailable","", "<div class='empty'>"+(ar?"الخبر غير متاح حاليًا.":"This story is not available right now.")+"</div>");
+  const target=story.link,meta=await articleMeta(target);
+  const title=strip(story.title||meta.title)||(ar?"الخبر":"Story");
+  const summary=strip(story.description||meta.description);
+  const imageUrl=story.image||meta.image||"/api/image?q="+encodeURIComponent(title);
+  const source=strip(story.source)||(()=>{try{const h=new URL(meta.url||target).hostname.replace(/^www\./,"");return /(^|\.)news\.google\.com$/i.test(h)?"News source":h}catch{return"Source"}})();
+  const date=dt(story.date,l),sentences=summary.replace(/\s+/g," ").split(/(?<=[.!?؟])\s+/).map(strip).filter(Boolean);
+  const intro=sentences.slice(0,2).join(" ")||summary,details=sentences.slice(2,7).join(" "),context=sentences.slice(7).join(" ");
+  const section=(heading,text)=>text?"<section class='article-section'><h2>"+esc(heading)+"</h2><p class='article-p'>"+esc(text)+"</p></section>":"";
+  const note=ar?"هذه صفحة عرض داخلية مبنية على البيانات المتاحة من مصدر الخبر. لا يتم نسخ المقال الأصلي حرفيًا.":"This internal page is based on available source data and does not reproduce the original third-party article verbatim.";
+  const body="<article class='article'><div class='article-top'><span class='source'>"+esc(source)+"</span>"+(date?"<span class='date'>"+esc(date)+"</span>":"")+"</div><h1>"+esc(title)+"</h1>"
+    +(imageUrl?"<figure class='article-media'><img src='"+esc(imageUrl)+"' alt='"+esc(title)+"' loading='eager' referrerpolicy='no-referrer' onerror=\"this.onerror=null;this.src='/api/image?q="+encodeURIComponent(title)+"'\"><figcaption>"+esc(title)+"</figcaption></figure>":"")
+    +"<div class='article-lead'>"+esc(intro||(ar?"لا تتوفر تفاصيل موثقة إضافية حاليًا.":"No additional verified details are currently available."))+"</div><div class='article-content'>"
+    +section(ar?"ملخص الخبر":"News summary",summary||intro)+section(ar?"التفاصيل المتاحة":"Available details",details)+section(ar?"السياق المتاح":"Available context",context)
+    +"<section class='article-section article-source-box'><h2>"+(ar?"المصدر":"Source")+"</h2><p class='article-p'>"+esc(source)+"</p><a class='btn source-link' href='"+esc(target)+"' target='_blank' rel='noopener noreferrer'>"+(ar?"فتح المصدر الأصلي":"Open original source")+"</a></section><div class='article-context'>"+esc(note)+"</div></div>"+ad()+"</article>";
+  return shell(l,title,"",body,summary||title);
 }
 async function searchPage(l,u){const q=clean(u.searchParams.get("q"));if(!q)return shell(l,l==="ar"?"البحث":"Search","", "<div class='hero'><h1>"+(l==="ar"?"البحث":"Search")+"</h1></div><div class='empty'>"+(l==="ar"?"اكتب كلمة أو اسمًا للبحث.":"Enter a name, topic or keyword.")+"</div>");const a=await search(q,l);const body="<section class='hero'><h1>"+(l==="ar"?"نتائج البحث عن: ":"Search results for: ")+esc(q)+"</h1><p>"+(l==="ar"?"اختر من النتائج لفتح الخبر داخل NowPulse.":"Choose a result to open the story inside NowPulse.")+"</p></section><div class='grid search-grid'>"+(a.length?a.map(x=>"<article class='card'><a href='/article/"+encodeURIComponent(x.id)+"?lang="+l+"'><div class='thumb'>"+(x.image?"<img src='"+esc(x.image)+"' alt='"+esc(x.title)+"' loading='lazy' referrerpolicy='no-referrer'>":"<img src='/api/image?q="+encodeURIComponent(x.title)+"' alt='"+esc(x.title)+"' loading='lazy' referrerpolicy='no-referrer'>")+"</div><div class='body'><div class='meta'>"+esc(x.source||"Web")+"</div><h3>"+esc(x.title)+"</h3><p class='desc'>"+esc(x.description||"")+"</p></div></a></article>").join(""):"<div class='empty'>"+(l==="ar"?"لم نعثر على نتائج متاحة.":"No results found.")+"</div>")+"</div>";return shell(l,l==="ar"?"البحث":"Search","",body)}
 function articleFallback(l,id){
@@ -240,4 +230,4 @@ function articleFallback(l,id){
 function robots(){return"User-agent: *\\nAllow: /\\nSitemap: "+SITE+"/sitemap.xml\\n"}
 function sitemap(){const a=["/",...Object.keys(CATS).map(k=>"/category/"+k)];return"<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>"+a.map(x=>"<url><loc>"+SITE+x+"</loc></url>").join("")+"</urlset>"}
 function feedXml(){return"<?xml version='1.0' encoding='UTF-8'?><rss version='2.0'><channel><title>NowPulse</title><link>"+SITE+"</link><description>NowPulse news and information</description></channel></rss>"}
-export default{async fetch(req){const u=new URL(req.url),p=u.pathname,l=u.searchParams.get("lang")==="en"?"en":"ar";try{if(p==="/health")return json({ok:true,service:"NowPulse",version:VERSION,time:new Date().toISOString()});if(p==="/ads.txt")return plain("google.com, pub-1235197294708204, DIRECT, f08c47fec0942fa0\\n");if(p==="/robots.txt")return plain(robots());if(p==="/sitemap.xml")return plain(sitemap(),200,"application/xml;charset=UTF-8");if(p==="/rss.xml")return plain(feedXml(),200,"application/rss+xml;charset=UTF-8");if(p==="/api/news")return json(await news(l));if(p==="/api/markets")return json(await markets());if(p==="/api/weather")return json(await weather(u.searchParams.get("city")||"cairo"));if(p==="/api/image")return json({image:await commons(clean(u.searchParams.get("q")))});if(p==="/search")return new Response(await searchPage(l,u),{headers:{"content-type":"text/html;charset=UTF-8","cache-control":"no-store, no-cache, must-revalidate"}});if(p.startsWith("/article/"))return new Response(await article(l,p.slice(9)),{headers:{"content-type":"text/html;charset=UTF-8"}});if(p.startsWith("/category/"))return new Response(await category(l,p.slice(9)),{headers:{"content-type":"text/html;charset=UTF-8"}});return new Response(home(l),{headers:{"content-type":"text/html;charset=UTF-8"}})}catch(e){console.error("NowPulse error",e?.stack||e);if(p.startsWith("/api/"))return json({ok:false,error:"temporary_error"},502);if(p.startsWith("/article/"))return new Response(articleFallback(l,p.slice(9)),{headers:{"content-type":"text/html;charset=UTF-8","cache-control":"no-store, no-cache, must-revalidate"}});return new Response("<!doctype html><html><body><h1>NowPulse</h1><p>"+(l==="ar"?"حدث خطأ مؤقت. أعد تحميل الصفحة.":"Temporary error. Reload the page.")+"</p></body></html>",{status:500,headers:{"content-type":"text/html;charset=UTF-8"}})}}};
+export default{async fetch(req){const u=new URL(req.url),p=u.pathname,l=u.searchParams.get("lang")==="en"?"en":"ar";try{if(p==="/health")return json({ok:true,service:"NowPulse",version:VERSION,time:new Date().toISOString()});if(p==="/ads.txt")return plain("google.com, pub-1235197294708204, DIRECT, f08c47fec0942fa0\\n");if(p==="/robots.txt")return plain(robots());if(p==="/sitemap.xml")return plain(sitemap(),200,"application/xml;charset=UTF-8");if(p==="/rss.xml")return plain(feedXml(),200,"application/rss+xml;charset=UTF-8");if(p==="/api/news")return json(await news(l));if(p==="/api/markets")return json(await markets());if(p==="/api/weather")return json(await weather(u.searchParams.get("city")||"cairo"));if(p==="/api/image")return imageResponse(clean(u.searchParams.get("q")));if(p==="/search")return await searchPage(l,u);if(p.startsWith("/article/"))return await article(l,p.slice(9));if(p.startsWith("/category/"))return await category(l,p.slice(9));return home(l)}catch(e){console.error("NowPulse error",e?.stack||e);if(p.startsWith("/api/"))return json({ok:false,error:"temporary_error"},502);if(p.startsWith("/article/"))return new Response(articleFallback(l,p.slice(9)),{headers:{"content-type":"text/html;charset=UTF-8","cache-control":"no-store, no-cache, must-revalidate"}});return new Response("<!doctype html><html><body><h1>NowPulse</h1><p>"+(l==="ar"?"حدث خطأ مؤقت. أعد تحميل الصفحة.":"Temporary error. Reload the page.")+"</p></body></html>",{status:500,headers:{"content-type":"text/html;charset=UTF-8"}})}}};
