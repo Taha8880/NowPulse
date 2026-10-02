@@ -38,14 +38,83 @@ async function commons(q){
 async function resolveSource(target){let current=url(target);if(!current)return "";for(let i=0;i<4;i++){try{const r=await fetch(current,{redirect:"manual",headers:{"user-agent":"NowPulse/1.1","accept":"text/html,application/xhtml+xml,*/*"}});if(r.status>=300&&r.status<400){const loc=r.headers.get("location");if(!loc)return current;current=new URL(loc,current).toString();continue}return r.url||current}catch{return current}}return current}
 async function articleMeta(target){const final=await resolveSource(target);if(!final||/news\.google\.com/i.test(final))return{url:target};try{const html=await getText(final),title=(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||"",desc=(html.match(/<meta[^>]+(?:name|property)=[\"'](?:description|og:description|twitter:description)[\"'][^>]+content=[\"']([^\"']*)/i)||[])[1]||"",og=(html.match(/<meta[^>]+(?:property|name)=[\"'](?:og:image|twitter:image)[\"'][^>]+content=[\"']([^\"']*)/i)||[])[1]||"",canonical=(html.match(/<link[^>]+rel=[\"']canonical[\"'][^>]+href=[\"']([^\"']*)/i)||[])[1]||"";return{url:url(canonical)||final,title:strip(title),description:strip(desc),image:url(og)||""}}catch{return{url:final}}}
 function classify(x){const s=(x.title+" "+x.description).toLowerCase();if(/sport|football|soccer|tennis|basket|رياض|مباراة|منتخب|دوري|كرة/.test(s))return"sports";if(/econom|market|gold|dollar|currency|inflation|اقتصاد|ذهب|دولار|عملات|بورصة/.test(s))return"economy";if(/technolog|artificial intelligence|\bai\b|تكنولوجيا|ذكاء اصطناعي|تقنية/.test(s))return"tech";if(/health|medical|medicine|doctor|صحة|طب|مرض/.test(s))return"health";if(/travel|tourism|سفر|سياحة/.test(s))return"travel";if(/politic|election|government|president|parliament|سياس|انتخاب|حكومة|رئيس|برلمان/.test(s))return"politics";if(/film|movie|music|actor|actress|فن|فيلم|موسيقى|ممثل|ترفيه/.test(s))return"arts";return"world"}
+const CATEGORY_QUERIES={
+  latest:["Egypt news","Arab world news","world news","breaking news"],
+  egypt:["Egypt latest news","Egypt Cairo news","Egypt economy sports technology"],
+  arab:["Saudi Arabia UAE Qatar news","Arab world latest news","Middle East news"],
+  world:["international world news","Europe Asia Americas news","global breaking news"],
+  politics:["world politics latest","government parliament elections diplomacy","international politics"],
+  sports:["football soccer sports latest","Egypt football sports","tennis basketball sports"],
+  economy:["Egypt economy dollar gold markets","global economy markets","business finance latest"],
+  tech:["technology latest","artificial intelligence technology","gadgets cybersecurity technology"],
+  arts:["arts entertainment latest","film music television celebrities","culture entertainment"],
+  health:["health medicine latest","medical science health","public health wellness"],
+  travel:["Egypt tourism travel","travel tourism latest","airlines destinations travel"],
+  trends:["trending news Egypt","trending news Arab world","viral trending topics"]
+};
+function categoryRelevant(x,k,lang){
+  const s=(x.title+" "+x.description).toLowerCase();
+  const ar=lang==="ar";
+  const egypt=ar?/مصر|القاهرة|الغردقة|الأقصر|الإسكندرية|الجنيه المصرى|الجنيه المصري/.test(s):/\begypt\b|cairo|hurghada|luxor|alexandria|egyptian pound/.test(s);
+  const arab=ar?/السعودية|الإمارات|قطر|الكويت|الأردن|المغرب|تونس|الجزائر|لبنان|العراق|فلسطين|عمان|البحرين|اليمن|ليبيا|سوريا|العالم العربي|الدول العربية/.test(s):/saudi|uae|qatar|kuwait|jordan|morocco|tunisia|algeria|lebanon|iraq|palestine|oman|bahrain|yemen|libya|syria|arab world/.test(s);
+  const politics=/politic|election|government|president|parliament|diplomacy|minister|policy|سياس|انتخاب|حكومة|رئيس|برلمان|دبلوماس|وزير|سياسة/.test(s);
+  const sports=/sport|football|soccer|tennis|basket|cricket|olympic|رياض|مباراة|منتخب|دوري|كرة|بطولة/.test(s);
+  const economy=/econom|market|gold|dollar|currency|inflation|finance|business|stock|اقتصاد|ذهب|دولار|عملات|تضخم|مالية|بورصة|أسواق/.test(s);
+  const tech=/technolog|artificial intelligence|\\bai\\b|cyber|software|smartphone|تكنولوجيا|ذكاء اصطناعي|تقنية|سيبراني|برمج/.test(s);
+  const arts=/film|movie|music|actor|actress|television|celebrity|culture|entertain|فن|فيلم|موسيقى|ممثل|ترفيه|ثقافة/.test(s);
+  const health=/health|medical|medicine|doctor|disease|hospital|صحة|طب|طبيب|مرض|مستشفى/.test(s);
+  const travel=/travel|tourism|tourist|airline|flight|hotel|destination|سفر|سياحة|سائح|طيران|فندق|وجهة/.test(s);
+  const trend=/trend|trending|viral|buzz|ترند|رائج|متداول|انتشر/.test(s);
+  if(k==="latest")return true;
+  if(k==="egypt")return egypt;
+  if(k==="arab")return arab&&!egypt;
+  if(k==="world")return !egypt&&!arab;
+  if(k==="politics")return politics;
+  if(k==="sports")return sports;
+  if(k==="economy")return economy;
+  if(k==="tech")return tech;
+  if(k==="arts")return arts;
+  if(k==="health")return health;
+  if(k==="travel")return travel;
+  if(k==="trends")return trend;
+  return false;
+}
+async function loadCategory(k,lang,limit=10){
+  const qs=CATEGORY_QUERIES[k]||[k];
+  const sets=await Promise.all(qs.map(q=>searchFeed(q,lang)));
+  let items=uniq(sets.flat());
+  if(k!=="latest"){
+    const matched=items.filter(x=>categoryRelevant(x,k,lang));
+    if(matched.length)items=matched;
+  }
+  items.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+  items=items.slice(0,limit);
+  const missing=items.filter(x=>!x.image).slice(0,6);
+  if(missing.length){
+    const imgs=await Promise.all(missing.map(x=>commons(x.title)));
+    missing.forEach((x,i)=>x.image=imgs[i]||"");
+  }
+  return items;
+}
 async function news(lang){
-  const q=Q[lang]||Q.ar,sets=await Promise.all(Object.keys(q).map(k=>searchFeed(q[k],lang)));let all=uniq(sets.flat());
-  if(all.length<8){const f=lang==="ar"?["https://feeds.bbci.co.uk/arabic/rss.xml"]:["https://feeds.bbci.co.uk/news/world/rss.xml","https://feeds.bbci.co.uk/news/world/middle_east/rss.xml"];const more=await Promise.all(f.map(async u=>{try{return rss(await getText(u),"RSS")}catch{return[]}}));all=uniq(all.concat(more.flat()))}
-  const score=x=>{const s=(x.title+" "+x.description).toLowerCase();if(lang==="ar"){if(/مصر|القاهرة|الغردقة|الأقصر|الإسكندرية/.test(s))return 4;if(/العالم العربي|السعودية|الإمارات|قطر|الكويت|الأردن|المغرب|تونس|الجزائر|لبنان|العراق/.test(s))return 3}else{if(/\begypt\b|cairo|hurghada|luxor|alexandria/.test(s))return 4;if(/arab|saudi|uae|qatar|kuwait|jordan|morocco|tunisia|algeria|lebanon|iraq/.test(s))return 3}return 0};
-  all.sort((a,b)=>(score(b)-score(a))||((Date.parse(b.date)||0)-(Date.parse(a.date)||0)));
-  const out={latest:all.slice(0,18)};for(const k of Object.keys(CATS).filter(k=>k!=="latest"))out[k]=[];
-  for(const x of all){const c=classify(x);if(out[c]?.length<8)out[c].push(x);const s=(x.title+" "+x.description).toLowerCase();if((lang==="ar"?/مصر|القاهرة|الغردقة|الأقصر|الإسكندرية/.test(s):/\begypt\b|cairo|hurghada|luxor|alexandria/.test(s))&&out.egypt.length<8)out.egypt.push(x);if((lang==="ar"?/العالم العربي|الدول العربية|السعودية|الإمارات|قطر|الكويت|الأردن|المغرب|تونس|الجزائر|لبنان|العراق/.test(s):/arab|saudi|uae|qatar|kuwait|jordan|morocco|tunisia|algeria|lebanon|iraq/.test(s))&&out.arab.length<8)out.arab.push(x);if(/trend|ترند/.test(s)&&out.trends.length<8)out.trends.push(x);if(out.world.length<8)out.world.push(x)}
-  const missing=all.filter(x=>!x.image).slice(0,8);const imgs=await Promise.all(missing.map(x=>commons(x.title)));missing.forEach((x,i)=>x.image=imgs[i]||"");
+  const keys=Object.keys(CATS);
+  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?18:8)]));
+  const out=Object.fromEntries(pairs);
+  const latest=uniq([
+    ...(out.egypt||[]),
+    ...(out.arab||[]),
+    ...(out.politics||[]),
+    ...(out.sports||[]),
+    ...(out.economy||[]),
+    ...(out.tech||[]),
+    ...(out.arts||[]),
+    ...(out.health||[]),
+    ...(out.travel||[]),
+    ...(out.trends||[]),
+    ...(out.world||[])
+  ]);
+  latest.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+  out.latest=latest.slice(0,18);
   return out;
 }
 async function markets(){
