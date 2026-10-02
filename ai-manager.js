@@ -61,6 +61,48 @@ async function generate(env,diag,mode,current){
 async function commit(env,next,message,sha){
   return req("https://api.github.com/repos/"+REPO+"/contents/"+FILE,{method:"PUT",headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"content-type":"application/json","x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.0"},body:JSON.stringify({message,content:b64(next),sha,branch:BRANCH})});
 }
+
+
+async function sleep(ms){await new Promise(r=>setTimeout(r,ms))}
+async function githubRuns(env,sha){
+  const r=await req("https://api.github.com/repos/"+REPO+"/actions/runs?branch="+encodeURIComponent(BRANCH)+"&per_page=10",{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.1"}});
+  if(!r.ok)return{ok:false,status:r.status,text:r.text};
+  const runs=(r.data.workflow_runs||[]).filter(x=>!sha||x.head_sha===sha);
+  return{ok:true,runs};
+}
+async function waitForDeploy(env,sha){
+  for(let i=0;i<18;i++){
+    const q=await githubRuns(env,sha);
+    if(q.ok&&q.runs?.length){
+      const run=q.runs[0];
+      if(run.status==="completed")return{ok:run.conclusion==="success",run};
+    }
+    await sleep(10000);
+  }
+  return{ok:false,timeout:true};
+}
+async function verifyProduction(){
+  const h=await site("/health");
+  const home=await site("/?lang=ar");
+  const n=await site("/api/news?lang=ar");
+  const m=await site("/api/markets");
+  const img=await site("/api/image?q=football");
+  let nx={},mx={};try{nx=JSON.parse(n.text||"{}")}catch{}try{mx=JSON.parse(m.text||"{}")}catch{}
+  const id=nx.latest?.[0]?.id;
+  const a=id?await site("/article/"+encodeURIComponent(id)+"?lang=ar"):{ok:false,text:"no story"};
+  const issues=[];
+  if(!h.ok||!/"ok":true/.test(h.text))issues.push("health");
+  if(!home.ok||!/NowPulse/.test(home.text))issues.push("home");
+  if(!n.ok||!Array.isArray(nx.latest)||nx.latest.length<5)issues.push("news");
+  if(!m.ok||!(Number(mx.fx?.usd?.mid)>0)||!(Number(mx.gold?.["24K"]?.mid)>0))issues.push("markets");
+  if(!img.ok||!/image\//i.test(img.text.slice(0,200)))issues.push("image");
+  if(!a.ok||!/<h1>/i.test(a.text)||/news\.google\.com\/rss/i.test(a.text))issues.push("article");
+  return{ok:issues.length===0,issues};
+}
+async function record(env,key,value){
+  if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put(key,JSON.stringify(value),{expirationTtl:2592000});
+}
+
 async function run(env,force=false){
   if(!env.NOWPULSE_GITHUB_TOKEN)return{ok:false,reason:"NOWPULSE_GITHUB_TOKEN missing"};
   const diag=await diagnose();
@@ -77,8 +119,17 @@ async function run(env,force=false){
   const message=repairNeeded?"AI repair: fix NowPulse production quality checks":"AI maintenance: conservative NowPulse quality improvement";
   const put=await commit(env,generated.next,message,g.data.sha);
   if(!put.ok)return{ok:false,reason:"GitHub write failed",status:put.status,detail:put.text,broken:diag.broken};
+  const sha=put.data.commit?.sha;
+  await record(env,"last-change",{time:new Date().toISOString(),mode:repairNeeded?"repair":"maintenance",commit:sha,broken:diag.broken});
+  const deploy=await waitForDeploy(env,sha);
+  const production=await verifyProduction();
+  if(!deploy.ok||!production.ok){
+    const rollback=await commit(env,current,"AI safety rollback: failed post-deploy verification",sha);
+    await record(env,"last-rollback",{time:new Date().toISOString(),failedCommit:sha,deploy,production,rollback:rollback.data?.commit?.sha||null});
+    return{ok:false,action:"rolled-back",commit:sha,rollback:rollback.data?.commit?.sha||null,broken:diag.broken,postDeploy:production,deploy};
+  }
   if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});if(!repairNeeded)await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
-  return{ok:true,action:repairNeeded?"repaired":"maintained",commit:put.data.commit?.sha,broken:diag.broken,quality:diag.quality};
+  return{ok:true,action:repairNeeded?"repaired":"maintained",commit:sha,broken:diag.broken,quality:diag.quality,postDeploy:production,deploy};
 }
 export default{
   async fetch(req,env){
