@@ -55,7 +55,12 @@ async function markets(){
     try{
       const x=await getJson("https://api.frankfurter.dev/v2/rate/"+base+"/EGP"),r=Number(x?.rate);
       if(r>0)d.fx[key]={mid:r,buy:r*1.0025,sell:r*0.9975};
-    }catch{}
+    }catch{
+      try{
+        const x=await getJson("https://open.er-api.com/v6/latest/"+base),r=Number(x?.rates?.EGP);
+        if(r>0)d.fx[key]={mid:r,buy:r*1.0025,sell:r*0.9975};
+      }catch{}
+    }
   }));
   let oz=null;
   try{oz=Number((await getJson("https://api.gold-api.com/price/XAU"))?.price)}catch{}
