@@ -45,6 +45,9 @@ jobs:
           head -c 300 /tmp/home.html || true
           echo
           test "$home_code" = "200"
+          markets="$(curl -fsSL "$base/api/markets")"
+          echo "$markets"
+          printf '%s' "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);const keys=["usdEgp","eurEgp","gbpEgp","chfEgp","gold24","gold21","gold18"];if(!keys.some(k=>Number(x[k])>0))process.exit(1)})'
           weather="$(curl -fsSL "$base/api/weather?city=cairo")"
           echo "$weather"
           printf '%s' "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Number.isFinite(Number(x.temperature)))process.exit(1)})'
