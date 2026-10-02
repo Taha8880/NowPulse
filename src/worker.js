@@ -127,9 +127,9 @@ async function markets(){
     }
   }));
   let oz=null;
-  try{oz=Number((await getJson("https://api.gold-api.com/price/XAU"))?.price)}catch{}
+  try{oz=Number((await getJson("https://api.frankfurter.dev/v2/rate/xau/usd"))?.rate)}catch{}
   if(!(oz>0)){
-    try{oz=Number((await getJson("https://api.frankfurter.dev/v2/rate/xau/usd"))?.rate)}catch{}
+    try{oz=Number((await getJson("https://api.gold-api.com/price/XAU"))?.price)}catch{}
   }
   const usd=d.fx.usd?.mid;
   if(oz>0&&usd>0){
