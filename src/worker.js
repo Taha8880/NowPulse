@@ -368,11 +368,9 @@ async function home(env,lang){
  try{
  const ar=lang==="ar";
  const empty={latest:[],egypt:[],arab:[],world:[],politics:[],sports:[],economy:[],tech:[],arts:[],health:[],travel:[],trends:[]};
- const [data,m,w]=await Promise.all([
-  news(env,lang,"latest").catch(()=>empty),
-  markets(env).catch(()=>({usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null})),
-  weather(env,"cairo").catch(()=>({cityAr:"القاهرة",cityEn:"Cairo",temperature:null,humidity:null}))
- ]);
+ const data=await news(env,lang,"latest").catch(()=>empty);
+ const m=await markets(env).catch(()=>({usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null}));
+ const w=await weather(env,"cairo").catch(()=>({cityAr:"القاهرة",cityEn:"Cairo",temperature:null,humidity:null}));
  const value=v=>typeof v==="number"&&v>0?v.toFixed(2):"—";
  const body="<section class='hero'><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع فصل واضح بين الخبر والمعلومة.":"Egypt and Arab news first, followed by global coverage, with clear separation between news and knowledge.")+"</p><div class='quote'>"+esc(quote(lang))+"</div></section>"+
  "<div class='markets'><div class='market'><b>USD / EGP</b><strong>"+value(m.usdEgp)+"</strong><em>USD</em></div><div class='market'><b>EUR / EGP</b><strong>"+value(m.eurEgp)+"</strong><em>EUR</em></div><div class='market'><b>GBP / EGP</b><strong>"+value(m.gbpEgp)+"</strong><em>GBP</em></div><div class='market'><b>CHF / EGP</b><strong>"+value(m.chfEgp)+"</strong><em>CHF</em></div><div class='market'><b>Gold 24K</b><strong>"+value(m.gold24)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 21K</b><strong>"+value(m.gold21)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 18K</b><strong>"+value(m.gold18)+"</strong><em>EGP / g</em></div></div>"+
