@@ -4,15 +4,7 @@
   "main":"src/worker.js",
   "compatibility_date":"2026-09-30",
   "preview_urls":false,
-  "kv_namespaces":[{"binding":"NOWPULSE_KV","id":"184c64ea1ed443e1bac081453cd599bf"}],
+  "vars":{"NOWPULSE_ENV":"production","NOWPULSE_VERSION":"1.0.0","ADSENSE_PUBLISHER_ID":"ca-pub-1235197294708204"},
   "triggers":{"crons":["*/15 * * * *"]},
-  "observability":{"enabled":true,"logs":{"enabled":true}},
-  "vars":{
-    "NOWPULSE_ENV":"production",
-    "NOWPULSE_VERSION":"9.0.0",
-    "ADSENSE_PUBLISHER_ID":"ca-pub-1235197294708204"
-  },
-  "compatibility_flags":["nodejs_compat"],
-  "durable_objects":{"bindings":[{"name":"NowPulseGuardian","class_name":"NowPulseGuardian"}]},
-  "exports":{"NowPulseGuardian":{"type":"durable-object","storage":"sqlite"}}
+  "observability":{"enabled":true,"logs":{"enabled":true}}
 }
