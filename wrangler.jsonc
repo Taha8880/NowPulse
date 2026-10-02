@@ -4,7 +4,7 @@
   "main":"src/worker.js",
   "compatibility_date":"2026-09-30",
   "preview_urls":false,
-  "vars":{"NOWPULSE_ENV":"production","NOWPULSE_VERSION":"1.0.0","ADSENSE_PUBLISHER_ID":"ca-pub-1235197294708204"},
+  "vars":{"NOWPULSE_ENV":"production","NOWPULSE_VERSION":"1.1.0","ADSENSE_PUBLISHER_ID":"ca-pub-1235197294708204"},
   "triggers":{"crons":["*/15 * * * *"]},
   "observability":{"enabled":true,"logs":{"enabled":true}},
   "exports":{"NowPulseGuardian":{"type":"durable-object","storage":"sqlite"}}
