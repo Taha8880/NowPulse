@@ -1,4 +1,4 @@
-const VERSION="1.8.0";
+const VERSION="1.8.1";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const ADSENSE="ca-pub-1235197294708204";
 export class NowPulseGuardian{constructor(state,env){this.state=state;this.env=env}async fetch(){return new Response(JSON.stringify({ok:true,service:"NowPulseGuardian",version:VERSION}),{headers:{"content-type":"application/json;charset=UTF-8"}})}}
@@ -85,10 +85,25 @@ async function commons(q){
 }
 function safeRemoteImage(u){try{const x=new URL(u),h=x.hostname.toLowerCase();return /^https?:$/.test(x.protocol)&&h!=="localhost"&&!h.endsWith(".local")&&!/^127\./.test(h)&&!/^10\./.test(h)&&!/^192\.168\./.test(h)&&!/^169\.254\./.test(h)&&!/^172\.(1[6-9]|2\d|3[01])\./.test(h)&&h!=="::1"&&!h.startsWith("fc")&&!h.startsWith("fd")}catch{return false}}
 function imageSrc(x,title){const u=String(x||"");if(u&&safeRemoteImage(u)&&!/(logo|favicon|avatar|icon|sprite|placeholder|default-image|publisher)/i.test(u))return "/api/image?src="+encodeURIComponent(u)+"&q="+encodeURIComponent(title);return "/api/image?q="+encodeURIComponent(title)}
+async function relatedImage(q){
+  try{
+    const d=await getJson("https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&format=json&maxrecords=20&timespan=30d&sort=datedesc");
+    const words=titleKey(q).split(/\s+/).filter(w=>w.length>3);
+    let best="",score=0;
+    for(const a of d.articles||[]){
+      const img=url(a.socialimage||"");
+      if(!img||!safeRemoteImage(img)||/(logo|favicon|avatar|icon|sprite|placeholder|publisher)/i.test(img))continue;
+      const k=titleKey(a.title||""),hits=words.reduce((n,w)=>n+(k.includes(w)?1:0),0),sc=words.length?hits/words.length:0;
+      if(sc>score){score=sc;best=img}
+    }
+    return score>=0.2?best:"";
+  }catch{return""}
+}
 async function imageResponse(q,src){
   if(src&&safeRemoteImage(src)){try{const r=await fetch(src,{headers:{"user-agent":"NowPulse Image Proxy/1.0","accept":"image/avif,image/webp,image/jpeg,image/png,*/*"}});if(r.ok&&/^image\//i.test(r.headers.get("content-type")||"")){const h=new Headers(r.headers);h.set("cache-control","public,max-age=21600,stale-while-revalidate=86400");h.set("x-content-type-options","nosniff");return new Response(r.body,{status:200,headers:h})}}catch{}}
   if(!q||/^(google news|nowpulse)$/i.test(q)||/comprehensive up-to-date news coverage/i.test(q))return new Response("",{status:404,headers:{"cache-control":"public,max-age=300"}});
-  const u=await commons(q);
+  let u=await relatedImage(q);
+  if(!u)u=await commons(q);
   if(!u)return new Response("",{status:404,headers:{"cache-control":"public,max-age=300"}});
   try{
     const r=await fetch(u,{headers:{"user-agent":"NowPulse Image Proxy/1.0","accept":"image/avif,image/webp,image/jpeg,image/png,*/*"}});
@@ -273,7 +288,7 @@ function home(l){
   +"r.innerHTML=h||'<div class=\'market-mini\'>'+(ar?'تعذر تحديث الأسعار مؤقتًا.':'Prices temporarily unavailable.')+'</div>';document.getElementById('marketUpdated').textContent=(ar?'آخر تحديث: ':'Updated: ')+new Date().toLocaleTimeString(ar?'ar-EG':'en-US');}catch{}}"
   +"async function refreshQuote(){if(quote)quote.textContent=q[Math.floor(Date.now()/30000)%q.length]||q[0]}"
   +"await refreshMarkets();refreshQuote();async function refreshWeather(){try{const w=await fetch('/api/weather?city=cairo&ts='+Date.now(),{cache:'no-store'}).then(r=>r.json());const z=document.getElementById('weather');if(z&&w&&w.temperature!=null)z.textContent=(ar?'القاهرة: ':'Cairo: ')+Number(w.temperature).toFixed(1)+'°C · '+Number(w.humidity??0)+'%';}catch{}} await refreshWeather();setInterval(refreshMarkets,900000);setInterval(refreshWeather,900000);setInterval(refreshQuote,30000);"
-  +"try{const ck='nowpulse-news-'+l,old=localStorage.getItem(ck);if(old){const cached=JSON.parse(old);renderNews(cached)}const n=await fetch('/api/news?lang='+l,{cache:'default'}).then(r=>r.json());localStorage.setItem(ck,JSON.stringify(n));renderNews(n)}catch{if(!f.innerHTML||/جاري تحميل|Loading/.test(f.innerText))f.innerHTML='<div class=empty>'+(ar?'تعذر تحديث الأخبار مؤقتًا.':'News update is temporarily unavailable.')+'</div>'}})();function renderNews(n){f.innerHTML='';const c="+JSON.stringify(CATS)+";for(const k of Object.keys(c)){const a=Array.isArray(n[k])?n[k].slice(0,6):[];if(!a.length)continue;const s=document.createElement('section');s.className='section';s.innerHTML=`<div class='section-head'><h2>${c[k][ar?0:1]}</h2><a href='/category/${k}?lang=${l}'>${ar?'عرض الكل':'View all'}</a></div><div class='grid'></div>`;const g=s.querySelector('.grid');a.forEach(x=>{const e=document.createElement('article');e.className='card';const href='/article/'+encodeURIComponent(storyIdClient(x))+'?lang='+l;const im=escH(clientImageSrc(x.image||'',x.title));e.innerHTML=`<a href='${href}'><div class='thumb'><img src='${im}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'></div><div class='body'><div class='meta'>${escH(x.source||'NowPulse')}${x.date?' · '+escH(new Date(x.date).toLocaleString(ar?'ar-EG':'en-US')):''}</div><h3>${escH(x.title)}</h3><p class='desc'>${escH(x.description||'')}</p></div></a>`;g.appendChild(e)});f.appendChild(s)}}}</script>";
+  +"try{const ck='nowpulse-news-'+l,old=localStorage.getItem(ck);if(old){try{const cached=JSON.parse(old);if(cached&&typeof cached==='object')renderNews(cached)}catch{localStorage.removeItem(ck)}}const n=await fetch('/api/news?lang='+l,{cache:'no-store'}).then(r=>r.json());localStorage.setItem(ck,JSON.stringify(n));renderNews(n)}catch{if(!f.innerHTML||/جاري تحميل|Loading/.test(f.innerText))f.innerHTML='<div class=empty>'+(ar?'تعذر تحديث الأخبار مؤقتًا.':'News update is temporarily unavailable.')+'</div>'}})();function renderNews(n){f.innerHTML='';const c="+JSON.stringify(CATS)+";for(const k of Object.keys(c)){const a=Array.isArray(n[k])?n[k].slice(0,6):[];if(!a.length)continue;const s=document.createElement('section');s.className='section';const sectionHref=k==='latest'?'/?lang='+l:'/category/'+k+'?lang='+l;s.innerHTML=`<div class='section-head'><h2>${c[k][ar?0:1]}</h2><a href='${sectionHref}'>${ar?'عرض الكل':'View all'}</a></div><div class='grid'></div>`;const g=s.querySelector('.grid');a.forEach(x=>{const e=document.createElement('article');e.className='card';const href='/article/'+encodeURIComponent(storyIdClient(x))+'?lang='+l;const im=escH(clientImageSrc(x.image||'',x.title));e.innerHTML=`<a href='${href}'><div class='thumb'><img src='${im}' alt='${escH(x.title)}' loading='lazy' referrerpolicy='no-referrer'></div><div class='body'><div class='meta'>${escH(x.source||'NowPulse')}${x.date?' · '+escH(new Date(x.date).toLocaleString(ar?'ar-EG':'en-US')):''}</div><h3>${escH(x.title)}</h3><p class='desc'>${escH(x.description||'')}</p></div></a>`;g.appendChild(e)});f.appendChild(s)}}}</script>";
   return shell(l,ar?"NowPulse":"NowPulse","latest",body,ar?"أخبار مصر والعالم العربي مع معلومات اقتصادية مختصرة.":"Egypt and Arab news with a compact market snapshot.");
 }
 async function category(l,k){
