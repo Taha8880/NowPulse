@@ -361,7 +361,7 @@ function sectionHtml(key,items,lang){
  if(!items?.length)return "";
  const ar=lang==="ar";
  const label=CATEGORIES[key]?.[ar?0:1]||key;
- return "<section class='section'><div class='section-head'><h2>"+esc(label)+"</h2><a href='/category/"+key+"?lang="+lang+"'>"+(ar?"عرض الكل":"View all")+"</a></div><div class='grid'>"+items.slice(0,6).map((x,i)=>card(x,lang,i===0)).join("")+"</div></section>";
+ return "<section class='section'><div class='section-head'><h2>"+esc(label)+"</h2><a href='/category/"+key+"?lang="+lang+"'>"+(ar?"عرض الكل":"View all")+"</a></div><div class='grid'>"+items.slice(0,3).map((x,i)=>card(x,lang,i===0)).join("")+"</div></section>";
 }
 
 async function home(env,lang){
