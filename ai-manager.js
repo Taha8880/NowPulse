@@ -12,11 +12,13 @@ function aiText(x){if(typeof x==="string")return x;if(x?.choices?.[0]?.message)r
 function codeOnly(s){let x=String(s||"").trim();const m=x.match(/```(?:javascript|js)?\s*([\s\S]*?)```/i);return m?m[1].trim():x}
 function validSource(s){
   const x=String(s||"");
-  if(x.length<12000||x.length>180000)return false;
+  if(x.length<12000||x.length>220000)return false;
   if(!x.includes("export default")||!x.includes("NowPulse")||!x.includes("async function news")||!x.includes("function shell")||!x.includes("/api/markets"))return false;
   const opens=(x.match(/[{}]/g)||[]).reduce((n,c)=>n+(c==="{"?1:-1),0);
   return opens===0;
 }
+function cleanPlanText(s){let x=String(s||"").trim();const m=x.match(/\\`\\`\\`(?:json)?\\s*([\\s\\S]*?)\\`\\`\\`/i);return m?m[1].trim():x}
+function parsePlan(s){try{const o=JSON.parse(cleanPlanText(s));if(!o||typeof o!=="object"||!o.files||typeof o.files!=="object")return null;return o}catch{return null}}
 async function diagnose(){
   const d={time:new Date().toISOString(),broken:[],quality:{}};
   d.health=await site("/health"); d.markets=await site("/api/markets"); d.news=await site("/api/news?lang=ar");
@@ -52,23 +54,35 @@ async function diagnose(){
 async function githubFile(env){
   return req("https://api.github.com/repos/"+REPO+"/contents/"+FILE+"?ref="+BRANCH,{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.0"}});
 }
-async function generate(env,diag,mode,current){
-  const mission=mode==="repair"
-    ?"Fix every failing production check while preserving existing working behavior."
-    :"Perform conservative production maintenance: improve only clear quality/reliability issues visible in the diagnostics. Do not redesign the site, remove routes, remove bilingual behavior, weaken SEO, or replace working APIs without a concrete reason.";
-  const rules="You are the senior production engineer for NowPulse. "+mission+" Return ONLY the complete src/worker.js JavaScript source, no Markdown. Keep Cloudflare Workers compatibility and the NowPulseGuardian Durable Object export. Arabic is primary RTL and English must remain complete LTR. Preserve all routes: /health /api/news /api/markets /api/weather /api/image /search /article/* /category/* /robots.txt /sitemap.xml /rss.xml /ads.txt and homepage. Never expose raw RSS HTML/entities or Google News wrapper pages. Every article/card must retain its title, description, source, date, original link and image metadata in an internal story ID so navigation never collapses to a generic event page. The /api/image route must return actual image bytes with an image content-type, not JSON. If a source image is missing, use a relevant Wikimedia Commons image through the proxy and reject logos/icons/placeholders. Verify that category navigation remains category-specific and that every card opens its own story. Article pages must show clean title/source/date/summary/relevant image and an original-source link, not republish full third-party articles. Prefer Egypt and Arab coverage, then world. Use real source images or relevant Wikimedia Commons fallback, never logos. Keep responsive professional formatting, balanced Arabic/English typography, visible controls/icons, dark/light mode, animated category-aware background, page transitions, working internal search, ads, SEO, and footer 'NowPulse · Created by Taha'. Do not add npm dependencies.";
-  const history=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-change"):null;
-  const rollback=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-rollback"):null;
-  const prompt=rules+"\nDiagnostics:\n"+JSON.stringify(diag)+"\nPrevious change:\n"+String(history||"none")+"\nPrevious rollback:\n"+String(rollback||"none")+"\nCurrent source:\n"+current;
-  let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Production Cloudflare Workers repair and maintenance agent."},{role:"user",content:prompt}],max_completion_tokens:30000,temperature:0.05,reasoning_effort:"high"},{gateway:{id:env.NOWPULSE_AI_GATEWAY_ID||"default",skipCache:true,collectLog:true,metadata:{service:"nowpulse-ai-manager",mode}}})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
-  const next=codeOnly(aiText(ai));if(!validSource(next))return{ok:false,reason:"AI returned invalid source",length:next.length};
-  return{ok:true,next};
+async function repoSnapshot(env){
+  const h={"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/3.0"};
+  const r=await req("https://api.github.com/repos/"+REPO+"/git/trees/"+BRANCH+"?recursive=1",{headers:h});
+  if(!r.ok)return{ok:false,status:r.status,text:r.text};
+  const files=(r.data.tree||[]).filter(x=>x.type==="blob"&&/\\.(js|mjs|json|jsonc|yaml|yml|md|html|css|txt)$/i.test(x.path)&&x.size<220000);
+  const out={};
+  for(const f of files){
+    const q=await req("https://api.github.com/repos/"+REPO+"/contents/"+encodeURIComponent(f.path).replace(/%2F/g,"/")+"?ref="+BRANCH,{headers:h});
+    if(q.ok&&q.data?.content)out[f.path]=atob(String(q.data.content).replace(/\\n/g,""));
+  }
+  return{ok:true,files:out,tree:r.data.tree||[]};
 }
-async function commit(env,next,message,sha){
-  return req("https://api.github.com/repos/"+REPO+"/contents/"+FILE,{method:"PUT",headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"content-type":"application/json","x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.0"},body:JSON.stringify({message,content:b64(next),sha,branch:BRANCH})});
+async function generate(env,diag,mode,snapshot){
+  const mission=mode==="repair"?"Find and fix every real defect you can identify across the entire repository, not only the listed diagnostics.":"Perform a deep preventive code review across every repository file and improve only clear reliability, security, performance, maintainability, SEO, accessibility, or UX defects without unnecessary redesign.";
+  const rules="You are the senior autonomous software engineer for NowPulse. "+mission+" You MUST inspect every supplied source/config/workflow/test file and reason about cross-file dependencies. Do not limit your review to predefined checks. Look for syntax/runtime errors, broken routes, incorrect API contracts, stale assumptions, encoding/RTL issues, async/concurrency bugs, caching, timeouts, error handling, security headers, injection/XSS risks, open redirects, URL validation, SSR/HTML escaping, SEO, accessibility, responsive CSS, performance, Cloudflare Workers compatibility, Wrangler configuration, Durable Objects, GitHub Actions, tests, deployment, secrets handling, dead code, duplicated logic, broken references, and regressions. Fix code when a defect is found. Preserve working behavior and all intended NowPulse features. Arabic remains RTL and English LTR. Preserve the NowPulseGuardian Durable Object export. Never expose raw RSS HTML/entities or Google News wrapper pages. Cards must preserve their own story metadata and open their own article. /api/image must return image bytes. Relevant images must not be logos/placeholders. Keep internal search, categories, markets, quotes, dark/light mode, animated background, SEO, ads and footer 'NowPulse · Created by Taha'. Do not add npm dependencies unless absolutely required and already supported by the repository.\n\nRETURN ONLY VALID JSON, no Markdown, in this exact shape: {\"summary\":\"brief audit summary\",\"findings\":[{\"path\":\"file\",\"severity\":\"critical|high|medium|low\",\"issue\":\"...\",\"fix\":\"...\"}],\"files\":{\"path/to/file\":\"COMPLETE NEW FILE CONTENT\"}}. The files object must contain ONLY files that you actually changed, and every changed file must contain its COMPLETE final content, not a diff. Never delete a file unless it is demonstrably harmful; if deletion is required, state it in findings but do not perform it automatically. Do not invent files. If no code change is justified, return an empty files object.\n\nProduction diagnostics:\n"+JSON.stringify(diag)+"\n\nRepository files:\n"+JSON.stringify(snapshot.files);
+  let ai;try{ai=await env.AI.run(env.NOWPULSE_AI_MODEL||MODEL,{messages:[{role:"system",content:"Autonomous repository-wide code auditor, debugger, and maintainer for Cloudflare Workers."},{role:"user",content:rules}],max_completion_tokens:60000,temperature:0.02,reasoning_effort:"high"},{gateway:{id:env.NOWPULSE_AI_GATEWAY_ID||"default",skipCache:true,collectLog:true,metadata:{service:"nowpulse-ai-manager",mode,scope:"repository-wide"}}})}catch(e){return{ok:false,reason:"AI inference failed",error:String(e)}}
+  const plan=parsePlan(aiText(ai));if(!plan)return{ok:false,reason:"AI returned invalid JSON plan"};
+  for(const [path,content] of Object.entries(plan.files||{})){if(!snapshot.files[path]&&path!=="src/worker.js")return{ok:false,reason:"AI attempted to create an unknown file",path};if(typeof content!=="string"||content.length>220000)return{ok:false,reason:"AI returned invalid file content",path};if(path==="src/worker.js"&&!validSource(content))return{ok:false,reason:"AI returned invalid worker source"}}
+  return{ok:true,plan};
 }
-
-
+async function commitFiles(env,files,message,parentSha,treeSha){
+  const h={"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"content-type":"application/json","x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/3.0"};
+  const entries=[];
+  for(const [path,content] of Object.entries(files)){const b=await req("https://api.github.com/repos/"+REPO+"/git/blobs",{method:"POST",headers:h,body:JSON.stringify({content,encoding:"utf-8"})});if(!b.ok)return{ok:false,stage:"blob",path,status:b.status,text:b.text};entries.push({path,mode:"100644",type:"blob",sha:b.data.sha})}
+  const t=await req("https://api.github.com/repos/"+REPO+"/git/trees",{method:"POST",headers:h,body:JSON.stringify({base_tree:treeSha,tree:entries})});if(!t.ok)return{ok:false,stage:"tree",status:t.status,text:t.text};
+  const c=await req("https://api.github.com/repos/"+REPO+"/git/commits",{method:"POST",headers:h,body:JSON.stringify({message,tree:t.data.sha,parents:[parentSha]})});if(!c.ok)return{ok:false,stage:"commit",status:c.status,text:c.text};
+  const u=await req("https://api.github.com/repos/"+REPO+"/git/refs/heads/"+BRANCH,{method:"PATCH",headers:h,body:JSON.stringify({sha:c.data.sha,force:false})});if(!u.ok)return{ok:false,stage:"ref",status:u.status,text:u.text};
+  return{ok:true,sha:c.data.sha,tree:t.data.sha};
+}
 async function sleep(ms){await new Promise(r=>setTimeout(r,ms))}
 async function githubRuns(env,sha){
   const r=await req("https://api.github.com/repos/"+REPO+"/actions/runs?branch="+encodeURIComponent(BRANCH)+"&per_page=10",{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/2.1"}});
@@ -112,30 +126,34 @@ async function record(env,key,value){
 async function run(env,force=false){
   if(!env.NOWPULSE_GITHUB_TOKEN)return{ok:false,reason:"NOWPULSE_GITHUB_TOKEN missing"};
   const diag=await diagnose();
-  const repairNeeded=diag.broken.length>0;
   const maintenanceEnabled=env.NOWPULSE_AI_MAINTENANCE!=="disabled";
   let maintenanceDue=false;
   if(maintenanceEnabled&&env.NOWPULSE_KV){const last=await env.NOWPULSE_KV.get("last-maintenance");maintenanceDue=!last||(Date.now()-Date.parse(last)>21600000)}
-  if(!force&&!repairNeeded&&!maintenanceDue)return{ok:true,action:"healthy",quality:diag.quality};
+  if(!force&&!diag.broken.length&&!maintenanceDue)return{ok:true,action:"healthy",quality:diag.quality};
   if(env.NOWPULSE_KV){const lock=await env.NOWPULSE_KV.get("repair-lock");if(lock&&!force)return{ok:true,action:"cooldown",broken:diag.broken}}
-  const g=await githubFile(env);if(!g.ok)return{ok:false,reason:"GitHub read failed",status:g.status,detail:g.text};
-  const current=atob(String(g.data.content||"").replace(/\n/g,""));
-  const generated=await generate(env,diag,repairNeeded?"repair":"maintenance",current);if(!generated.ok)return{...generated,broken:diag.broken};
-  if(generated.next===current)return{ok:true,action:"no-change",broken:diag.broken};
-  const message=repairNeeded?"AI repair: fix NowPulse production quality checks":"AI maintenance: conservative NowPulse quality improvement";
-  const put=await commit(env,generated.next,message,g.data.sha);
-  if(!put.ok)return{ok:false,reason:"GitHub write failed",status:put.status,detail:put.text,broken:diag.broken};
-  const sha=put.data.commit?.sha;
-  await record(env,"last-change",{time:new Date().toISOString(),mode:repairNeeded?"repair":"maintenance",commit:sha,broken:diag.broken});
-  const deploy=await waitForDeploy(env,sha);
-  const production=await verifyProduction();
+  const snapshot=await repoSnapshot(env);if(!snapshot.ok)return{ok:false,reason:"Repository snapshot failed",detail:snapshot.text};
+  const history=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-change"):null;
+  const rollback=env.NOWPULSE_KV?await env.NOWPULSE_KV.get("last-rollback"):null;
+  diag.repository={files:Object.keys(snapshot.files),fileCount:Object.keys(snapshot.files).length,previousChange:history,previousRollback:rollback};
+  const mode=diag.broken.length?"repair":"maintenance";
+  const generated=await generate(env,diag,mode,snapshot);if(!generated.ok)return{...generated,broken:diag.broken};
+  const changes=generated.plan.files||{};
+  if(!Object.keys(changes).length){if(env.NOWPULSE_KV)await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString());return{ok:true,action:"audited-no-change",broken:diag.broken,findings:generated.plan.findings||[]}}
+  const currentRef=await req("https://api.github.com/repos/"+REPO+"/git/ref/heads/"+BRANCH,{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/3.0"}});if(!currentRef.ok)return{ok:false,reason:"Git ref read failed"};
+  const parent=currentRef.data.object.sha;
+  const commitInfo=await req("https://api.github.com/repos/"+REPO+"/git/commits/"+parent,{headers:{"authorization":"Bearer "+env.NOWPULSE_GITHUB_TOKEN,"x-github-api-version":"2026-03-10","user-agent":"NowPulse-AI-Manager/3.0"}});if(!commitInfo.ok)return{ok:false,reason:"Commit read failed"};
+  const changed={};const original={};for(const [p,c] of Object.entries(changes)){changed[p]=c;original[p]=snapshot.files[p]}
+  const put=await commitFiles(env,changed,"AI repository-wide "+mode+": autonomous code audit and repair",parent,commitInfo.data.tree.sha);
+  if(!put.ok)return{ok:false,reason:"Repository commit failed",detail:put};
+  await record(env,"last-change",{time:new Date().toISOString(),mode,commit:put.sha,changed:Object.keys(changes),findings:generated.plan.findings||[],broken:diag.broken});
+  const deploy=await waitForDeploy(env,put.sha);const production=await verifyProduction();
   if(!deploy.ok||!production.ok){
-    const rollback=await commit(env,current,"AI safety rollback: failed post-deploy verification",sha);
-    await record(env,"last-rollback",{time:new Date().toISOString(),failedCommit:sha,deploy,production,rollback:rollback.data?.commit?.sha||null});
-    return{ok:false,action:"rolled-back",commit:sha,rollback:rollback.data?.commit?.sha||null,broken:diag.broken,postDeploy:production,deploy};
+    const rb=await commitFiles(env,original,"AI safety rollback: failed repository post-deploy verification",put.sha,commitInfo.data.tree.sha);
+    await record(env,"last-rollback",{time:new Date().toISOString(),failedCommit:put.sha,changed:Object.keys(changes),deploy,production,rollback:rb});
+    return{ok:false,action:"rolled-back",commit:put.sha,rollback:rb,changed:Object.keys(changes),findings:generated.plan.findings||[],postDeploy:production,deploy};
   }
-  if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});if(!repairNeeded)await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
-  return{ok:true,action:repairNeeded?"repaired":"maintained",commit:sha,broken:diag.broken,quality:diag.quality,postDeploy:production,deploy};
+  if(env.NOWPULSE_KV){await env.NOWPULSE_KV.put("repair-lock",new Date().toISOString(),{expirationTtl:3600});await env.NOWPULSE_KV.put("last-maintenance",new Date().toISOString())}
+  return{ok:true,action:mode==="repair"?"repaired":"maintained",commit:put.sha,changed:Object.keys(changes),findings:generated.plan.findings||[],broken:diag.broken,postDeploy:production,deploy};
 }
 export default{
   async fetch(req,env){
