@@ -366,32 +366,29 @@ function sectionHtml(key,items,lang){
 
 async function home(env,lang){
  const ar=lang==="ar";
- const [data,m,w]=await Promise.all([news(env,lang,"latest"),markets(env),weather(env,"cairo")]);
- const value=v=>typeof v==="number"&&v>0?v.toFixed(2):"—";
- const marketCard=(label,v,unit)=>"<div class='market'><b>"+esc(label)+"</b><strong>"+value(v)+"</strong><em>"+esc(unit||"")+"</em></div>";
- const marketBlock="<div class='markets'>"+
-  marketCard("USD / EGP",m.usdEgp,ar?"دولار":"USD")+
-  marketCard("EUR / EGP",m.eurEgp,ar?"يورو":"EUR")+
-  marketCard("GBP / EGP",m.gbpEgp,ar?"جنيه إسترليني":"GBP")+
-  marketCard("CHF / EGP",m.chfEgp,ar?"فرنك":"CHF")+
-  marketCard("Gold 24K",m.gold24,"EGP / g")+
-  marketCard("Gold 21K",m.gold21,"EGP / g")+
-  marketCard("Gold 18K",m.gold18,"EGP / g")+
-  "</div>";
- const weatherBlock="<div class='weather'>☁ <span>"+esc(ar?w.cityAr:w.cityEn)+" · "+(typeof w.temperature==="number"?w.temperature.toFixed(1):"—")+"°C · "+(typeof w.humidity==="number"?w.humidity.toFixed(0):"—")+"%</span></div>";
  const body="<section class='hero'><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع تغطية مستقلة للسياسة والأحداث الدولية.":"Egypt and Arab news first, followed by global coverage, with independent coverage of politics and international events.")+"</p><div class='quote'>"+esc(quote(lang))+"</div></section>"+
-  marketBlock+weatherBlock+
-  sectionHtml("egypt",data.egypt,lang)+
-  sectionHtml("arab",data.arab,lang)+
-  sectionHtml("world",data.world,lang)+
-  sectionHtml("politics",data.politics,lang)+
-  sectionHtml("sports",data.sports,lang)+
-  sectionHtml("economy",data.economy,lang)+
-  sectionHtml("tech",data.tech,lang)+
-  sectionHtml("arts",data.arts,lang)+
-  sectionHtml("health",data.health,lang)+
-  sectionHtml("travel",data.travel,lang)+
-  sectionHtml("trends",data.trends,lang);
+ "<div class='markets' aria-label='Markets'>"+
+ "<div class='market'><b>USD / EGP</b><strong id='usd'>—</strong><em>USD</em></div>"+
+ "<div class='market'><b>EUR / EGP</b><strong id='eur'>—</strong><em>EUR</em></div>"+
+ "<div class='market'><b>GBP / EGP</b><strong id='gbp'>—</strong><em>GBP</em></div>"+
+ "<div class='market'><b>CHF / EGP</b><strong id='chf'>—</strong><em>CHF</em></div>"+
+ "<div class='market'><b>Gold 24K</b><strong id='g24'>—</strong><em>EGP / g</em></div>"+
+ "<div class='market'><b>Gold 21K</b><strong id='g21'>—</strong><em>EGP / g</em></div>"+
+ "<div class='market'><b>Gold 18K</b><strong id='g18'>—</strong><em>EGP / g</em></div></div>"+
+ "<div class='weather' id='weather'>"+(ar?"جاري تحديث الطقس...":"Updating weather...")+"</div>"+
+ "<div id='news' class='section'><div class='empty'>"+(ar?"جاري تحميل الأخبار...":"Loading news...")+"</div></div>"+
+ "<script>(async()=>{const lang="+JSON.stringify(lang)+",ar=lang==='ar',root=document.getElementById('news');"+
+ "const escClient=v=>String(v??'').replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[m]));"+
+ "const n=await fetch('/api/news?lang='+lang).then(r=>r.json()).catch(()=>({}));root.innerHTML='';"+
+ "const cats="+JSON.stringify(Object.keys(CATEGORIES))+";const labels="+JSON.stringify(CATEGORIES)+";"+
+ "for(const key of cats){const items=Array.isArray(n[key])?n[key].slice(0,6):[];if(!items.length)continue;"+
+ "const s=document.createElement('section');s.className='section';s.innerHTML='<div class=section-head><h2>'+escClient(labels[key][ar?0:1])+'</h2><a href=\"/category/'+key+'?lang='+lang+'\">'+(ar?'عرض الكل':'View all')+'</a></div><div class=grid></div>';"+
+ "const g=s.querySelector('.grid');for(const x of items){const a=document.createElement('article');a.className='card';a.innerHTML='<a><div class=thumb></div><div class=card-body><div class=meta></div><h3></h3><p class=desc></p></div></a>';"+
+ "const link='/article/'+encodeURIComponent(x.id)+'?lang='+lang;a.querySelector('a').href=link;a.querySelector('.meta').textContent=(x.source||'NowPulse')+(x.date?' · '+new Date(x.date).toLocaleString(lang==='ar'?'ar-EG':'en-US'):'');a.querySelector('h3').textContent=x.title||'';a.querySelector('.desc').textContent=x.description||'';"+
+ "const ph=a.querySelector('.thumb');if(x.image){const im=new Image();im.src=x.image;im.alt=x.title||'';im.loading='lazy';im.referrerPolicy='no-referrer';ph.appendChild(im)}else{ph.className+=' placeholder';ph.textContent=ar?'صورة مرتبطة بالموضوع':'Topic image';}g.appendChild(a)}root.appendChild(s)}"+
+ "const m=await fetch('/api/markets').then(r=>r.json()).catch(()=>({}));const f=v=>Number(v)>0?Number(v).toFixed(2):'—';"+
+ "[['usd','usdEgp'],['eur','eurEgp'],['gbp','gbpEgp'],['chf','chfEgp'],['g24','gold24'],['g21','gold21'],['g18','gold18']].forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.textContent=f(m[k])});"+
+ "const w=await fetch('/api/weather?city=cairo').then(r=>r.json()).catch(()=>({}));document.getElementById('weather').textContent=(ar?'القاهرة':'Cairo')+' · '+(Number(w.temperature)>0?Number(w.temperature).toFixed(1):'—')+'°C · '+(Number(w.humidity)>=0?Number(w.humidity).toFixed(0):'—')+'%';})()</script>";
  return shell(lang,ar?"نبض الآن":"NowPulse","latest",body);
 }
 
