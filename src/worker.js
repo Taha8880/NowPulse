@@ -365,20 +365,19 @@ function sectionHtml(key,items,lang){
 }
 
 async function home(env,lang){
- const data=await news(env,lang,"latest");
  const ar=lang==="ar";
+ const empty={latest:[],egypt:[],arab:[],world:[],politics:[],sports:[],economy:[],tech:[],arts:[],health:[],travel:[],trends:[]};
+ const [data,m,w]=await Promise.all([
+  news(env,lang,"latest").catch(()=>empty),
+  markets(env).catch(()=>({usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null})),
+  weather(env,"cairo").catch(()=>({cityAr:"القاهرة",cityEn:"Cairo",temperature:null,humidity:null}))
+ ]);
  const value=v=>typeof v==="number"&&v>0?v.toFixed(2):"—";
- const m={usdEgp:null,eurEgp:null,gbpEgp:null,chfEgp:null,gold24:null,gold21:null,gold18:null};
- const w={cityAr:"القاهرة",cityEn:"Cairo",temperature:null,humidity:null};
- const body="<section class=\"hero\"><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع فصل واضح بين الخبر والمعلومة.":"Egypt and Arab news first, followed by global coverage, with clear separation between news and knowledge.")+"</p><div class=\"quote\">"+esc(quote(lang))+"</div></section>"+
- "<div class=\"markets\"><div class=\"market\"><b>USD / EGP</b><strong id=\"mk-usd\">"+value(m.usdEgp)+"</strong><em>USD</em></div><div class=\"market\"><b>EUR / EGP</b><strong id=\"mk-eur\">"+value(m.eurEgp)+"</strong><em>EUR</em></div><div class=\"market\"><b>GBP / EGP</b><strong id=\"mk-gbp\">"+value(m.gbpEgp)+"</strong><em>GBP</em></div><div class=\"market\"><b>CHF / EGP</b><strong id=\"mk-chf\">"+value(m.chfEgp)+"</strong><em>CHF</em></div><div class=\"market\"><b>Gold 24K</b><strong id=\"mk-g24\">"+value(m.gold24)+"</strong><em>EGP / g</em></div><div class=\"market\"><b>Gold 21K</b><strong id=\"mk-g21\">"+value(m.gold21)+"</strong><em>EGP / g</em></div><div class=\"market\"><b>Gold 18K</b><strong id=\"mk-g18\">"+value(m.gold18)+"</strong><em>EGP / g</em></div></div>"+
- "<div class=\"weather\">☁ <span id=\"weather-value\">"+(ar?"جاري تحديث الطقس...":"Updating weather...")+"</span></div>"+
+ const body="<section class='hero'><h1>"+(ar?"المعلومة الدقيقة تبدأ من مصدر موثوق":"Accurate information starts with a trusted source")+"</h1><p>"+(ar?"أخبار مصر والعالم العربي أولًا، ثم الأخبار العالمية، مع فصل واضح بين الخبر والمعلومة.":"Egypt and Arab news first, followed by global coverage, with clear separation between news and knowledge.")+"</p><div class='quote'>"+esc(quote(lang))+"</div></section>"+
+ "<div class='markets'><div class='market'><b>USD / EGP</b><strong>"+value(m.usdEgp)+"</strong><em>USD</em></div><div class='market'><b>EUR / EGP</b><strong>"+value(m.eurEgp)+"</strong><em>EUR</em></div><div class='market'><b>GBP / EGP</b><strong>"+value(m.gbpEgp)+"</strong><em>GBP</em></div><div class='market'><b>CHF / EGP</b><strong>"+value(m.chfEgp)+"</strong><em>CHF</em></div><div class='market'><b>Gold 24K</b><strong>"+value(m.gold24)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 21K</b><strong>"+value(m.gold21)+"</strong><em>EGP / g</em></div><div class='market'><b>Gold 18K</b><strong>"+value(m.gold18)+"</strong><em>EGP / g</em></div></div>"+
+ "<div class='weather'>☁ <span>"+(ar?w.cityAr:w.cityEn)+" · "+(typeof w.temperature==="number"?w.temperature.toFixed(1):"—")+"°C · "+(typeof w.humidity==="number"?w.humidity.toFixed(0):"—")+"%</span></div>"+
  sectionHtml("egypt",data.egypt,lang)+sectionHtml("arab",data.arab,lang)+sectionHtml("world",data.world,lang)+sectionHtml("politics",data.politics,lang)+sectionHtml("sports",data.sports,lang)+sectionHtml("economy",data.economy,lang)+sectionHtml("tech",data.tech,lang);
- const client=String.raw`<script>
-(async()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=Number(v)>0?Number(v).toFixed(2):"—"};try{const r=await fetch("https://getdaleelak.com/api/v1/feed.json",{cache:"no-store"}),f=await r.json(),a=Array.isArray(f.assets)?f.assets:[],v=x=>Number(x?.global?.value)>0?Number(x.global.value):Number(x?.benchmark?.sell)>0?Number(x.benchmark.sell):Number(x?.directions?.sell?.best?.value),c=k=>a.find(x=>String(x?.id||"").toUpperCase()===k+"-EGP");set("mk-usd",v(c("USD")));set("mk-eur",v(c("EUR")));set("mk-gbp",v(c("GBP")));set("mk-chf",v(c("CHF")));const g=a.filter(x=>/gold|xau|ذهب/i.test(String(x?.id||"")+" "+String(x?.slug||"")+" "+String(x?.unit||""))),gv=g.map(v).find(n=>n>0);set("mk-g24",gv);set("mk-g21",gv?gv*.875:null);set("mk-g18",gv?gv*.75:null)}catch{}})();
-(async()=>{try{const r=await fetch("/api/weather?city=cairo",{cache:"no-store"}),x=await r.json(),e=document.getElementById("weather-value"),ar=document.documentElement.lang==="ar";if(e)e.textContent=(ar?"القاهرة":"Cairo")+" · "+(Number.isFinite(Number(x.temperature))?Number(x.temperature).toFixed(1):"—")+"°C · "+(Number.isFinite(Number(x.humidity))?Number(x.humidity).toFixed(0):"—")+"%"}catch{}})();
-</script>`;
- return shell(lang,ar?"نبض الآن":"NowPulse","latest",body+client);
+ return shell(lang,ar?"نبض الآن":"NowPulse","latest",body);
 }
 async function categoryPage(env,lang,cat){
  const items=await feed(env,lang,cat);
