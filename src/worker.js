@@ -177,32 +177,36 @@ function home(l){
 }
 async function category(l,k){
   if(!CATS[k])k="latest";
-  const n=await news(l),a=n[k]||[],title=CATS[k][l==="ar"?0:1];
+  const a=await loadCategory(k,l,k==="latest"?18:12),title=CATS[k][l==="ar"?0:1];
   const content=a.length
     ? "<div class='grid'>"+a.map(x=>card(x,l)).join("")+"</div>"
     : "<div class='empty'>"+(l==="ar"?"لا توجد أخبار حديثة متاحة الآن.":"No recent news is available right now.")+"</div>";
   return shell(l,title,k,"<section class='hero'><h1>"+esc(title)+"</h1><p>"+(l==="ar"?"أحدث النتائج المتاحة من مصادر الأخبار.":"Latest available results from news sources.")+"</p></section>"+ad()+content);
 }
 async function article(l,id){
-  const target=dec(decodeURIComponent(id)),n=await news(l);
-  let x=Object.values(n).flat().find(v=>v?.id===id);
-  if(!x&&target)x={id,link:target,title:"",description:"",date:"",source:"",image:""};
-  if(!x)return shell(l,l==="ar"?"الخبر غير متاح":"Story unavailable","",
-    "<div class='empty' style='margin-top:30px'>"+(l==="ar"?"الخبر غير متاح حاليًا.":"This story is not available right now.")+"</div>");
-  const meta=await articleMeta(x.link);
-  if(meta.title&&meta.title!=="Google News")x.title=meta.title;
-  if(meta.description)x.description=meta.description;
-  if(meta.image&&!/logo|favicon|icon|avatar|placeholder/i.test(meta.image))x.image=meta.image;
-  if(!x.image)x.image=await commons(x.title);
+  const target=dec(decodeURIComponent(id));
+  if(!target){
+    return shell(l,l==="ar"?"الخبر غير متاح":"Story unavailable","",
+      "<div class='empty' style='margin-top:30px'>"+(l==="ar"?"الخبر غير متاح حاليًا.":"This story is not available right now.")+"</div>");
+  }
+  const meta=await articleMeta(target);
+  let x={
+    id,
+    link:target,
+    title:meta.title&&meta.title!=="Google News"?meta.title:"",
+    description:meta.description||"",
+    date:"",
+    source:"",
+    image:meta.image||""
+  };
+  if(!x.title)x.title=target;
+  if(!x.image&&!/logo|favicon|icon|avatar|placeholder/i.test(x.title))x.image=await commons(x.title);
+  x.source=(()=>{try{return new URL(meta.url||target).hostname.replace(/^www\\./,"")}catch{return"Source"}})();
 
-  x.source=x.source||((()=>{try{return new URL(x.link).hostname.replace(/^www\\./,"")}catch{return"Source"}})());
   const title=strip(x.title)||"NowPulse";
   const summary=strip(x.description);
   const date=dt(x.date,l),source=strip(x.source)||"NowPulse";
   const ar=l==="ar";
-
-  // Build a detailed, readable internal presentation from verified source data.
-  // Never invent facts or reproduce third-party articles verbatim.
   const sentences=summary
     .replace(/\\s+/g," ")
     .split(/(?<=[.!?؟])\\s+/)
@@ -211,13 +215,11 @@ async function article(l,id){
   const details=sentences.slice(2,6).join(" ");
   const remaining=sentences.slice(6).join(" ");
   const fallback=summary|| (ar?"لا تتوفر تفاصيل إضافية موثقة في المصدر المتاح حاليًا.":"No additional verified details are available from the source data currently accessible.");
-
   const section=(heading,text)=>{
     if(!text)return "";
     return "<section class='article-section'><h2>"+esc(heading)+"</h2><p class='article-p'>"+esc(text)+"</p></section>";
   };
   const context=ar?"المصدر: "+source:"Source: "+source;
-
   const body="<article class='article'>"
     +"<div class='article-top'><span class='source'>"+esc(source)+"</span>"+(date?"<span class='date'>"+esc(date)+"</span>":"")+"</div>"
     +"<h1>"+esc(title)+"</h1>"
