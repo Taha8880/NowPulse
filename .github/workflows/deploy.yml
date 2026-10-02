@@ -39,6 +39,7 @@ jobs:
           news="$(curl -fsSL --max-time 35 "$SITE/api/news?lang=ar")"
           echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x.latest))process.exit(1)})'
           markets="$(curl -fsSL --max-time 25 "$SITE/api/markets")"
+          echo "MARKETS_RESPONSE=$markets"
           echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);for(const k of ["usd","eur","gbp","sar","aed"])if(!(Number(x.fx?.[k]?.mid)>0))process.exit(1);for(const k of ["24K","21K","18K"])if(!(Number(x.gold?.[k]?.mid)>0))process.exit(1)})'
           weather="$(curl -fsSL --max-time 25 "$SITE/api/weather?city=cairo")"
           echo "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!(Number(x.temperature)>-90)&&x.temperature!==null)process.exit(1)})'
