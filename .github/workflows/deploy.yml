@@ -30,7 +30,7 @@ jobs:
           health="$(curl -fsSL --max-time 20 "$SITE/health")"
           echo "$health"
           echo "$health" | grep -q '"ok":true'
-          echo "$health" | grep -q '"version":"1.2.1"'
+          echo "$health" | grep -q '"version":"1.3.0"'
           curl -fsSL --max-time 25 "$SITE/?lang=ar" -o /tmp/home.html
           grep -q 'NowPulse' /tmp/home.html
           curl -fsSL --max-time 25 "$SITE/robots.txt" | grep -q 'Sitemap'
@@ -39,7 +39,7 @@ jobs:
           news="$(curl -fsSL --max-time 35 "$SITE/api/news?lang=ar")"
           echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x.latest))process.exit(1)})'
           markets="$(curl -fsSL --max-time 25 "$SITE/api/markets")"
-          echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);for(const k of ["usdEgp","eurEgp","gbpEgp","gold24","gold21","gold18"])if(!(Number(x[k])>0))process.exit(1)})'
+          echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);for(const k of ["usd","eur","gbp","sar","aed"])if(!(Number(x.fx?.[k]?.mid)>0))process.exit(1);for(const k of ["24K","21K","18K"])if(!(Number(x.gold?.[k]?.mid)>0))process.exit(1)})'
           weather="$(curl -fsSL --max-time 25 "$SITE/api/weather?city=cairo")"
           echo "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!(Number(x.temperature)>-90)&&x.temperature!==null)process.exit(1)})'
           for cat in latest egypt arab world politics sports economy tech arts health travel trends; do
@@ -53,4 +53,5 @@ jobs:
           test -n "$article_id"
           curl -fsSL --max-time 35 "$SITE/article/$article_id?lang=ar" -o /tmp/article.html
           grep -q '<h1>' /tmp/article.html
-          grep -q 'قراءة المصدر الأصلي' /tmp/article.html
+          grep -q 'article-content' /tmp/article.html
+          ! grep -q 'news.google.com' /tmp/article.html
