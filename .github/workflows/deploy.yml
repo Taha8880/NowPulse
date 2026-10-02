@@ -42,7 +42,8 @@ jobs:
           printf '%s' "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x)||!x.length)process.exit(1)})'
           home_code="$(curl --compressed -sS -o /tmp/home.html -w '%{http_code}' --max-time 25 "$base/?lang=ar" || true)"
           echo "HOME_HTTP=$home_code"
-          head -c 1200 /tmp/home.html || true
+          head -c 300 /tmp/home.html || true
+          echo
           test "$home_code" = "200"
           weather="$(curl -fsSL "$base/api/weather?city=cairo")"
           echo "$weather"
