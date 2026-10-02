@@ -95,7 +95,7 @@ function home(l){
   +"<div class='market-table-wrap'><table class='market-table compact'><thead><tr><th>"+(ar?"العملة / العيار":"Currency / Type")+"</th><th>"+(ar?"السعر":"Price")+"</th></tr></thead><tbody id='marketRows'><tr><td colspan='2'>"+(ar?"جاري تحديث الأسعار...":"Updating prices...")+"</td></tr></tbody></table></div></section>"
   +"<div class='weather' id='weather'>"+(ar?"جاري تحديث الطقس...":"Updating weather...")+"</div><div id='feed'><div class='empty' style='margin-top:18px'>"+(ar?"جاري تحميل الأخبار...":"Loading news...")+"</div></div>"
   +"<script>(async()=>{const l="+JSON.stringify(l)+",ar=l==='ar',f=document.getElementById('feed'),q="+JSON.stringify(QUOTES)+",quote=document.getElementById('quote');"
-  +"function escH(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}"
+  +"function escH(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
   +"function price(v,cur){return Number(v)>0?Number(v).toLocaleString(ar?'ar-EG':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur:'—'}"
   +"function row(name,v,cur){if(!v||Number(v.mid||v.buy)<=0)return '';const p=Number(v.mid||((Number(v.buy)+Number(v.sell))/2));return '<tr><td>'+escH(name)+'</td><td>'+price(p,cur)+'</td></tr>'}"
   +"async function refreshMarkets(){try{const m=await fetch('/api/markets?ts='+Date.now(),{cache:'no-store'}).then(r=>r.json()),r=document.getElementById('marketRows');let h='';"
