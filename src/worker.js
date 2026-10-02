@@ -1,4 +1,4 @@
-const VERSION="1.7.1";
+const VERSION="1.8.0";
 const SITE="https://nowpulse.tavengers16.workers.dev";
 const ADSENSE="ca-pub-1235197294708204";
 export class NowPulseGuardian{constructor(state,env){this.state=state;this.env=env}async fetch(){return new Response(JSON.stringify({ok:true,service:"NowPulseGuardian",version:VERSION}),{headers:{"content-type":"application/json;charset=UTF-8"}})}}
@@ -55,7 +55,7 @@ function enrichOriginalLinks(items,extra){
 async function searchFeed(q,lang){
   let items=[];
   try{items=rss(await getText("https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+(lang==="ar"?"ar":"en-US")+"&gl="+(lang==="ar"?"EG":"US")+"&ceid="+(lang==="ar"?"EG:ar":"US:en")))}catch{}
-  if(items.length<5||items.some(x=>/news\.google\.com/i.test(x.link||""))){
+  if(items.length<5){
     const extra=await gdeltFeed(q,lang);
     items=enrichOriginalLinks(items,extra);
     items=uniq(items.concat(extra));
@@ -159,15 +159,32 @@ async function news(lang){
   const previous=await readNewsArchive(lang);
   const cleanOld=(a)=>Array.isArray(a)?a.filter(validStory):[];
   const keys=Object.keys(CATS);
-  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?24:8)]));
-  const fresh=Object.fromEntries(pairs);
-  const out={};
+  // One focused feed per section keeps the homepage off the expensive multi-query path.
+  const primary=await Promise.all(keys.map(async k=>{
+    const q=(CATEGORY_QUERIES[k]||[k])[0];
+    return [k,await searchFeed(q,lang)];
+  }));
+  const fresh=Object.fromEntries(primary);
+  const missing=keys.filter(k=>k!=="latest"&&(!fresh[k]||fresh[k].length<3));
+  if(missing.length){
+    const fallback=await Promise.all(missing.map(async k=>{
+      const q=(CATEGORY_QUERIES[k]||[k]).slice(1,2)[0]||k;
+      return [k,await searchFeed(q,lang)];
+    }));
+    for(const [k,v] of fallback)fresh[k]=uniq([...(fresh[k]||[]),...(v||[])]);
+  }
+  let out={};
   for(const k of keys){
     const old=cleanOld(previous?.[k]);
-    out[k]=uniq([...(fresh[k]||[]),...old]).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,k==="latest"?60:24);
+    const freshItems=uniq((fresh[k]||[]).filter(validStory));
+    out[k]=uniq([...freshItems,...old]).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,k==="latest"?60:24);
   }
-  const latest=uniq(keys.filter(k=>k!=="latest").flatMap(k=>cleanOld(out[k]||[]))).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
-  out.latest=uniq([...(fresh.latest||[]).filter(validStory),...latest,...cleanOld(previous?.latest)]).filter(validStory).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,60);
+  let latest=uniq(keys.filter(k=>k!=="latest").flatMap(k=>cleanOld(out[k]||[]))).filter(validStory).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+  if(latest.length<8){
+    const extra=await searchFeed(lang==="ar"?"أخبار مصر والعالم العربي":"Egypt Arab world latest news",lang);
+    latest=uniq([...latest,...extra]).filter(validStory).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
+  }
+  out.latest=uniq([...(fresh.latest||[]),...latest,...cleanOld(previous?.latest)]).filter(validStory).sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)).slice(0,60);
   await writeNewsArchive(lang,out);
   return out;
 }
@@ -268,3 +285,5 @@ function sitemap(){const a=["/",...Object.keys(CATS).map(k=>"/category/"+k)];ret
 function feedXml(){return"<?xml version='1.0' encoding='UTF-8'?><rss version='2.0'><channel><title>NowPulse</title><link>"+SITE+"</link><description>NowPulse news and information</description></channel></rss>"}
 export async function scheduled(event,env,ctx){ctx.waitUntil(Promise.allSettled([news("ar"),news("en"),markets()]));}
 export default{async fetch(req,env){const u=new URL(req.url),p=u.pathname,l=u.searchParams.get("lang")==="en"?"en":"ar";try{if(p==="/health")return json({ok:true,service:"NowPulse",version:VERSION,time:new Date().toISOString()});if(p==="/ads.txt")return plain("google.com, pub-1235197294708204, DIRECT, f08c47fec0942fa0\\n");if(p==="/robots.txt")return plain(robots());if(p==="/sitemap.xml")return plain(sitemap(),200,"application/xml;charset=UTF-8");if(p==="/rss.xml")return plain(feedXml(),200,"application/rss+xml;charset=UTF-8");if(p==="/api/news")return json(await news(l));if(p==="/api/markets")return json(await markets());if(p==="/api/weather")return json(await weather(u.searchParams.get("city")||"cairo"));if(p==="/api/image")return imageResponse(clean(u.searchParams.get("q")),clean(u.searchParams.get("src")));if(p==="/api/article-details"){const story=storyFromId(clean(u.searchParams.get("id")));if(!story||!validStory(story))return json({ok:false,error:"invalid_story"},400);return json(await articleDetails(story,env));}if(p==="/search")return await searchPage(l,u);if(p.startsWith("/article/"))return await article(l,p.slice(9));if(p.startsWith("/category/"))return await category(l,p.slice(9));return home(l)}catch(e){console.error("NowPulse error",e?.stack||e);if(p.startsWith("/api/"))return json({ok:false,error:"temporary_error"},502);if(p.startsWith("/article/"))return new Response(articleFallback(l,p.slice(9)),{headers:{"content-type":"text/html;charset=UTF-8","cache-control":"no-store, no-cache, must-revalidate"}});return new Response("<!doctype html><html><body><h1>NowPulse</h1><p>"+(l==="ar"?"حدث خطأ مؤقت. أعد تحميل الصفحة.":"Temporary error. Reload the page.")+"</p></body></html>",{status:500,headers:{"content-type":"text/html;charset=UTF-8"}})}}};
+
+
