@@ -40,6 +40,18 @@ jobs:
           news="$(curl -fsSL --max-time 35 "$SITE/api/news?lang=ar")"
           echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!Array.isArray(x.latest))process.exit(1)})'
           markets="$(curl -fsSL --max-time 25 "$SITE/api/markets")"
-          echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||typeof x!=="object")process.exit(1)})'
+          echo "$markets" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);for(const k of ["usdEgp","eurEgp","gbpEgp","gold24","gold21","gold18"])if(!(Number(x[k])>0))process.exit(1)})'
           weather="$(curl -fsSL --max-time 25 "$SITE/api/weather?city=cairo")"
-          echo "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!("temperature" in x))process.exit(1)})'
+          echo "$weather" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x||!(Number(x.temperature)>-90)&&x.temperature!==null)process.exit(1)})'
+          for cat in latest egypt arab world politics sports economy tech arts health travel trends; do
+            curl -fsSL --max-time 35 "$SITE/category/$cat?lang=ar" -o "/tmp/$cat.html"
+            grep -q '<html' "/tmp/$cat.html"
+            grep -q 'NowPulse' "/tmp/$cat.html"
+          done
+          curl -fsSL --max-time 25 "$SITE/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar" -o /tmp/search.html
+          grep -q 'نتائج البحث' /tmp/search.html
+          article_id="$(echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);process.stdout.write(x.latest?.[0]?.id||"")})')"
+          test -n "$article_id"
+          curl -fsSL --max-time 35 "$SITE/article/$article_id?lang=ar" -o /tmp/article.html
+          grep -q '<h1>' /tmp/article.html
+          grep -q 'قراءة المصدر الأصلي' /tmp/article.html
