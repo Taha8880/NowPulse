@@ -89,7 +89,7 @@ async function loadCategory(k,lang,limit=10){
   }
   items.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
   items=items.slice(0,limit);
-  const missing=items.filter(x=>!x.image).slice(0,6);
+  const missing=items.filter(x=>!x.image).slice(0,2);
   if(missing.length){
     const imgs=await Promise.all(missing.map(x=>commons(x.title)));
     missing.forEach((x,i)=>x.image=imgs[i]||"");
@@ -98,7 +98,7 @@ async function loadCategory(k,lang,limit=10){
 }
 async function news(lang){
   const keys=Object.keys(CATS);
-  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?18:8)]));
+  const pairs=await Promise.all(keys.map(async k=>[k,await loadCategory(k,lang,k==="latest"?18:6)]));
   const out=Object.fromEntries(pairs);
   const latest=uniq([
     ...(out.egypt||[]),
