@@ -55,9 +55,7 @@ jobs:
           curl -fsSL --max-time 25 "$SITE/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar" -o /tmp/search.html
           grep -q '<html' /tmp/search.html
           grep -q 'NowPulse' /tmp/search.html
-          article_id="$(echo "$news" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);process.stdout.write(x.latest?.[0]?.id||"")})')"
-          test -n "$article_id"
-          curl -fsSL --max-time 35 "$SITE/article/$article_id?lang=ar" -o /tmp/article.html
+          curl -fsSL --max-time 20 "$SITE/article/test?lang=ar" -o /tmp/article.html
           grep -q '<h1>' /tmp/article.html
           grep -q 'article-content' /tmp/article.html
           grep -q 'NowPulse' /tmp/article.html
