@@ -12,7 +12,7 @@ const strip=v=>clean(entities(String(v??"").replace(/<!\[CDATA\[|\]\]>/g,"").rep
 const url=v=>{try{const u=new URL(String(v||""));return /^https?:$/.test(u.protocol)?u.toString():""}catch{return""}};
 const json=(x,s=200)=>new Response(JSON.stringify(x),{status:s,headers:{"content-type":"application/json;charset=UTF-8","cache-control":"no-store"}});
 const plain=(x,s=200,t="text/plain;charset=UTF-8")=>new Response(x,{status:s,headers:{"content-type":t}});
-async function getText(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),6500);try{const r=await fetch(u,{signal:c.signal,headers:{"user-agent":"NowPulse/1.0","accept":"application/rss+xml,application/xml,text/xml,*/*"}});if(!r.ok)throw Error("HTTP "+r.status);return await r.text()}finally{clearTimeout(t)}}
+async function getText(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),3500);try{const r=await fetch(u,{signal:c.signal,headers:{"user-agent":"NowPulse/1.0","accept":"application/rss+xml,application/xml,text/xml,*/*"}});if(!r.ok)throw Error("HTTP "+r.status);return await r.text()}finally{clearTimeout(t)}}
 async function getJson(u){const c=new AbortController(),t=setTimeout(()=>c.abort(),6500);try{const r=await fetch(u,{signal:c.signal,headers:{"user-agent":"NowPulse/1.0","accept":"application/json"}});if(!r.ok)throw Error("HTTP "+r.status);return await r.json()}finally{clearTimeout(t)}}
 function tag(x,n){const m=String(x).match(new RegExp("<"+n+"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/"+n+">","i"));return m?clean(m[1]):""}
 function attr(x,n,a){const m=String(x).match(new RegExp("<"+n+"\\b[^>]*\\b"+a+"=[\"']([^\"']+)[\"'][^>]*>","i"));return m?m[1]:""}
