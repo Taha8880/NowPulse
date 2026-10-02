@@ -196,7 +196,7 @@ async function article(l,id){
   };
   if(!x.title)x.title=target;
   if(!x.image)x.image="/api/image?q="+encodeURIComponent(x.title);
-  x.source=(()=>{try{return new URL(meta.url||target).hostname.replace(/^www\\./,"")}catch{return"Source"}})();
+  x.source=(()=>{try{const h=new URL(meta.url||target).hostname.replace(/^www\\./,"");return /(^|\\.)news\\.google\\.com$/i.test(h)?"News source":h}catch{return"Source"}})();
 
   const title=strip(x.title)||"NowPulse";
   const summary=strip(x.description);
